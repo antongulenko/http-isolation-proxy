@@ -10,10 +10,11 @@ import (
 )
 
 const (
-	lock_expiration = 3 * time.Second
-	item_prefix     = "item/"
-	lock_prefix     = "lock/"
-	all_items_key   = "all_items"
+	item_lock_retries = 5
+	lock_expiration   = 3 * time.Second
+	item_prefix       = "item/"
+	lock_prefix       = "lock/"
+	all_items_key     = "all_items"
 )
 
 type Catalog struct {
@@ -51,6 +52,7 @@ func (catalog *Catalog) MakeItem(name string, initialStock uint64, cost float64)
 			LockName:   lock_prefix + item_prefix + name,
 			LockValue:  catalog.redisLockValue,
 			Expiration: lock_expiration,
+			Retry:      item_lock_retries, // This is a frequent lock, do a feq retries
 		},
 	}
 	item.StoredObject = services.StoredObject{item}

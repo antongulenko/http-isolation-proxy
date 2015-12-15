@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -107,7 +108,7 @@ type HttpStatusError struct {
 func (err *HttpStatusError) Error() string {
 	var bodyErr string
 	if err.Body != "" {
-		bodyErr = ": " + err.Body
+		bodyErr = ": " + strings.TrimSpace(err.Body)
 	}
 	return fmt.Sprintf("Error-response to %v: Status %v%s", err.URL, err.Status, bodyErr)
 }

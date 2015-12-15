@@ -13,7 +13,7 @@ import (
 
 const (
 	order_lock_prefix           = "order_lock/"
-	order_scan_interval         = 3 * time.Second
+	order_scan_interval         = 1 * time.Second
 	order_processing_expiration = 10 * time.Second
 )
 
@@ -28,15 +28,17 @@ func (shop *Shop) LoopScanOrders(ids chan<- string) {
 	}
 }
 
-func (shop *Shop) scanOrders(ids chan<- string) {
+func (shop *Shop) scanOrders(ids chan<- string) (result uint) {
 	open_orders, err := shop.redis.Cmd("smembers", open_orders_key).List()
 	if err != nil {
-		shop.log("Error retrieving list of open orders:", err)
+		shop.log("Error retrieving list of open orders: %v", err)
 		return
 	}
 	for _, order_id := range open_orders {
 		ids <- order_id
+		result++
 	}
+	return
 }
 
 func (shop *Shop) LoopProcessOrders(ids <-chan string) {
@@ -67,7 +69,7 @@ func (shop *Shop) processOrder(order_id string) {
 	order := shop.MakeOrder(order_id)
 	existed, err := order.LoadExisting()
 	if err != nil {
-		shop.log("Error fetching order %v: %v\n", order_id, err)
+		shop.log("Error fetching order %v: %v", order_id, err)
 		return
 	} else if !existed {
 		shop.log("Order locked for processing not found: %v", order_id)
@@ -136,7 +138,7 @@ func (order *Order) checkShipmentStatus(expectedStatus catalogApi.ShipmentStatus
 	if shipmentStatus := order.shipmentStatus(); shipmentStatus == "" {
 		return false
 	} else if shipmentStatus != expectedStatus {
-		order.shop.log("Shipment %v did not change to status %v (instead %v)\n", order.ShipmentId, expectedStatus, shipmentStatus)
+		order.shop.log("Shipment %v did not change to status %v (instead %v)", order.ShipmentId, expectedStatus, shipmentStatus)
 		return false
 	}
 	return true
@@ -209,23 +211,23 @@ func (order *Order) checkError(err error) bool {
 		order.Cancel(err)
 		return true
 	}
-	order.shop.log("Error processing order %v: %v\n", order.id, err)
+	order.shop.log("Error processing order %v: %v", order.id, err)
 	return true
 }
 
 func (order *Order) Finalize() {
-	order.shop.log("Finalizing order %v\n", order.id)
+	order.shop.log("Finalizing order %v", order.id)
 	logStr := "Order processed successfully"
 	if err := order.doCancel(true, logStr); err != nil {
-		order.shop.log("Finalizing order %v failed: %v\n", order.id, err)
+		order.shop.log("Finalizing order %v failed: %v", order.id, err)
 	}
 }
 
 func (order *Order) Cancel(cause error) {
-	order.shop.log("Cancelling order %v because of: %v\n", order.id, cause)
+	order.shop.log("Cancelling order %v because of: %v", order.id, cause)
 	logStr := fmt.Sprintf("Cancelling because of: %v", cause)
 	if err := order.doCancel(false, logStr); err != nil {
-		order.shop.log("Cancelling order %v failed: %v\n", order.id, err)
+		order.shop.log("Cancelling order %v failed: %v", order.id, err)
 	}
 }
 

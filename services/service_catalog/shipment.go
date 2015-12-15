@@ -48,15 +48,16 @@ func (item *Item) Ship(user string, qty uint64, timestamp string) (*Shipment, bo
 	// Create a reproducible ID based on input data (hence the timestamp)
 	hash := services.MakeHash(user, item.Name, qty, timestamp)
 	shipment := item.catalog.MakeShipment(hash)
-	existed, err := shipment.LoadExisting()
-	if err != nil {
-		return nil, false, err
-	}
 
 	if err := shipment.lock.Lock(); err != nil {
 		return nil, false, fmt.Errorf("Failed to lock shipment: %v", err)
 	}
 	defer shipment.unlock()
+
+	existed, err := shipment.LoadExisting()
+	if err != nil {
+		return nil, false, err
+	}
 
 	if !existed {
 		shipment.User = user
@@ -137,13 +138,15 @@ func (shipment *Shipment) Deliver() error {
 func (shipment *Shipment) modifyItem(description string, modify func(item *Item) error) error {
 	item := shipment.catalog.MakeItem(shipment.Item, 0, 0)
 
-	// Lock the item we are about to change
+	// Lock the item we are about to change.
 	if err := item.redisLock.Lock(); err != nil {
 		return fmt.Errorf("Failed to lock item: %v", err)
 	}
-	if err := item.redisLock.Unlock(); err != nil {
-		log.Println("Error releasing redis lock for item:", err)
-	}
+	defer func() {
+		if err := item.redisLock.Unlock(); err != nil {
+			log.Println("Error releasing redis lock for item:", err)
+		}
+	}()
 
 	if err := item.Load(); err != nil {
 		return fmt.Errorf("Error updating item for %v shipment: %v", description, err)

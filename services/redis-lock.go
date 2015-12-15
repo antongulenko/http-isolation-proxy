@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"code.google.com/p/go-uuid/uuid"
@@ -43,6 +44,7 @@ type RedisLock struct {
 	LockName   string
 	LockValue  string // Should be unique per client (use LoadLockValue())
 	Expiration time.Duration
+	Retry      uint
 }
 
 func RegisterLockScripts(client Redis) error {
@@ -70,13 +72,30 @@ func (lock *RedisLock) LoadLockValue(key string) error {
 	}
 }
 
-func (lock *RedisLock) Lock() error {
+func (lock *RedisLock) TryLock() error {
 	resp := lock.Client.Cmd("set", lock.LockName, lock.LockValue, "ex", lock.Expiration.Seconds(), "nx")
 	str, err := resp.Str()
 	if resp.HasResult() && err == nil && str == "OK" {
 		return nil
 	}
 	return LockFailed
+}
+
+func (lock *RedisLock) Lock() error {
+	var i uint = 0
+	for ; i == 0 || i < lock.Retry; i++ {
+		err := lock.TryLock()
+		if err == LockFailed {
+			continue
+		} else {
+			return err
+		}
+	}
+	if lock.Retry <= 1 {
+		return LockFailed
+	} else {
+		return fmt.Errorf("%v, giving up after %v attempts", LockFailed, i)
+	}
 }
 
 func (lock *RedisLock) Unlock() error {

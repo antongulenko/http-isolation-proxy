@@ -36,14 +36,14 @@ type Item catalogApi.Item
 
 type Order struct {
 	shopApi.Order
-	services.StoredObject `json:"-" redis:"-"`
+	services.StoredObject `json:"-"`
 
 	Timestamp  string `json:"-"`
 	ShipmentId string `json:"-"`
 	PaymentId  string `json:"-"`
 
 	id   string
-	shop *Shop `redis:"-"`
+	shop *Shop
 }
 
 func (order *Order) Key() string {
