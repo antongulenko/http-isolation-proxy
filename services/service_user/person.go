@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"sync"
 	"time"
 
+	"github.com/antongulenko/http-isolation-proxy/services"
 	"github.com/antongulenko/http-isolation-proxy/services/service_bank/bankApi"
 	"github.com/antongulenko/http-isolation-proxy/services/service_shop/shopApi"
 )
@@ -29,6 +29,10 @@ type Person struct {
 
 	monthlyPay float64
 	Name       string
+
+	running bool
+	paused  bool
+	cond    sync.Cond
 }
 
 func (person *Person) String() string {
@@ -45,22 +49,65 @@ func RandomPerson(name string, bankEndpoint string, shopEndpoint string) *Person
 		monthlyPay:   monthlyPay,
 		bank:         bankApi.NewHttpBank(bankEndpoint),
 		shopEndpoint: shopEndpoint,
+		cond:         sync.Cond{L: new(sync.Mutex)},
+		paused:       true,
+		running:      true,
 	}
 }
 
 func (person *Person) Live(wg *sync.WaitGroup) {
 	wg.Add(1)
-	go person.doLive()
+	go person.doLive(wg)
 }
 
-func (person *Person) doLive() {
+func (person *Person) Start() {
+	person.cond.L.Lock()
+	defer person.cond.L.Unlock()
+	person.paused = false
+	person.cond.Broadcast()
+}
+
+func (person *Person) Pause() {
+	person.cond.L.Lock()
+	defer person.cond.L.Unlock()
+	person.paused = true
+}
+
+func (person *Person) Terminate() {
+	person.cond.L.Lock()
+	defer person.cond.L.Unlock()
+	person.paused = false
+	person.running = false
+	person.cond.Broadcast()
+}
+
+func (person *Person) pauseOrQuit() bool {
+	person.cond.L.Lock()
+	defer person.cond.L.Unlock()
+	for person.paused {
+		person.cond.Wait()
+	}
+	return !person.running
+}
+
+func (person *Person) doLive(wg *sync.WaitGroup) {
+	defer wg.Done()
 	day := start_day
 	for {
+		if person.pauseOrQuit() {
+			return
+		}
 		day++
 		if day%days_per_month == 0 {
 			person.earn()
 		}
+		if person.pauseOrQuit() {
+			return
+		}
 		person.shop()
+		if person.pauseOrQuit() {
+			return
+		}
 		person.sleep()
 	}
 }
@@ -69,14 +116,14 @@ func (person *Person) error(err error) bool {
 	if err == nil {
 		return false
 	} else {
-		log.Printf("%v: %v\n", person.Name, err)
+		services.L.Warnf("%v: %v", person.Name, err)
 		return true
 	}
 }
 
 func (person *Person) earn() {
 	_, err := person.bank.Deposit(person.Name, person.monthlyPay)
-	log.Printf("%v earning %v\n", person.Name, person.monthlyPay)
+	services.L.Logf("%v earning %v", person.Name, person.monthlyPay)
 	person.error(err)
 }
 
@@ -87,7 +134,7 @@ func (person *Person) shop() {
 	}
 	item_index := rand.Uint32() % uint32(len(items))
 	item := items[item_index].Name
-	log.Printf("%v ordering %v\n", person.Name, item)
+	services.L.Logf("%v ordering %v", person.Name, item)
 	err = shopApi.PlaceOrder(person.shopEndpoint, person.Name, item, 1)
 	person.error(err)
 }

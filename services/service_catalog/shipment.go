@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/antongulenko/http-isolation-proxy/services"
 	"github.com/antongulenko/http-isolation-proxy/services/service_catalog/catalogApi"
@@ -73,7 +72,7 @@ func (item *Item) Ship(user string, qty uint64, timestamp string) (*Shipment, bo
 
 func (shipment *Shipment) unlock() {
 	if err := shipment.lock.Unlock(); err != nil {
-		log.Println("Error releasing redis lock for shipment:", err)
+		services.L.Warnf("Error releasing redis lock for shipment:", err)
 	}
 }
 
@@ -144,7 +143,7 @@ func (shipment *Shipment) modifyItem(description string, modify func(item *Item)
 	}
 	defer func() {
 		if err := item.redisLock.Unlock(); err != nil {
-			log.Println("Error releasing redis lock for item:", err)
+			services.L.Warnf("Error releasing redis lock for item:", err)
 		}
 	}()
 
@@ -188,7 +187,7 @@ func (shipment *Shipment) doCancel() error {
 	return shipment.modifyItem("cancelling",
 		func(item *Item) error {
 			if item.Reserved < shipment.Quantity {
-				log.Printf("Inconsistency warning: Cancelling %v %v, but only %v were reserved\n", shipment.Quantity, item.Name, item.Reserved)
+				services.L.Warnf("Inconsistency warning: Cancelling %v %v, but only %v were reserved\n", shipment.Quantity, item.Name, item.Reserved)
 				item.Reserved = 0
 			} else {
 				item.Reserved -= shipment.Quantity

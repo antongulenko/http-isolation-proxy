@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"time"
 
@@ -27,9 +26,6 @@ type Shop struct {
 	redisLockValue  string
 	catalogEndpoint string
 	paymentEndpoint string
-
-	LogEnabled   bool
-	TraceEnabled bool
 }
 
 type Item catalogApi.Item
@@ -52,18 +48,6 @@ func (order *Order) Key() string {
 
 func (order *Order) Client() services.Redis {
 	return order.shop.redis
-}
-
-func (shop *Shop) trace(fmt string, v ...interface{}) {
-	if shop.TraceEnabled {
-		log.Printf(fmt+"\n", v...)
-	}
-}
-
-func (shop *Shop) log(fmt string, v ...interface{}) {
-	if shop.LogEnabled {
-		log.Printf(fmt+"\n", v...)
-	}
 }
 
 func (shop *Shop) AllItems() ([]*Item, error) {

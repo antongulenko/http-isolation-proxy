@@ -24,7 +24,7 @@ var (
 		"TV":        100,
 		"Spaceship": 1,
 	}
-	num_users = 10
+	num_users = 1000
 )
 
 func roundInt(val float64) int {
@@ -37,11 +37,6 @@ func round(val float64) float64 {
 }
 
 func main() {
-	var users []string
-	for i := 0; i < num_users; i++ {
-		users = append(users, fmt.Sprintf("User%v", i))
-	}
-
 	bank := bankApi.NewHttpBank("localhost:9001")
 	shopEndpoint := "localhost:9004"
 
@@ -68,7 +63,9 @@ func main() {
 	var processedOrders uint64
 	var totalEarnedOrders float64
 	var totalShippedOrders uint64
-	for _, user := range users {
+	for i := 0; i < num_users; i++ {
+		user := fmt.Sprintf("User%v", i)
+
 		orders, err := shopApi.AllOrders(shopEndpoint, user)
 		check(err)
 		for _, order := range orders {

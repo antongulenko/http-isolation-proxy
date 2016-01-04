@@ -8,6 +8,11 @@ import (
 	"github.com/gorilla/mux"
 )
 
+func (store *AccountStore) show_stats(w http.ResponseWriter, r *http.Request) {
+	stats := store.Stats()
+	services.Http_respond_json(w, r, stats)
+}
+
 func (store *AccountStore) get_account(w http.ResponseWriter, r *http.Request) *Account {
 	username := mux.Vars(r)["id"]
 	if account := store.GetAccount(username); account == nil {

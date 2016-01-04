@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/antongulenko/http-isolation-proxy/services"
@@ -148,7 +147,7 @@ func (payment *Payment) LoadExisting(lockPayment bool, unlock_missing_payment bo
 
 func (payment *Payment) unlock() {
 	if err := payment.lock.Unlock(); err != nil {
-		log.Println("Error releasing redis lock for payment:", err)
+		services.L.Warnf("Error releasing redis lock for payment:", err)
 	}
 }
 
@@ -192,6 +191,7 @@ func (payment *Payment) Cancel() error {
 func (payment *Payment) inferState() error {
 	if payment.TransactionId == "" {
 		payment.setStatus(PaymentCreated)
+		return nil
 	}
 	if trans, err := payment.getTransaction(); err != nil {
 		return err

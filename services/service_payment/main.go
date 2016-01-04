@@ -39,7 +39,7 @@ func main() {
 	mux.HandleFunc("/payment/{id}/commit", payments.commit_payment).Methods("POST")
 	mux.HandleFunc("/payment/{id}/cancel", payments.cancel_payment).Methods("POST")
 
-	log.Println("Running on " + *addr)
+	services.L.Warnf("Running on " + *addr)
 	if err := http.ListenAndServe(*addr, mux); err != nil {
 		log.Fatal(err)
 	}

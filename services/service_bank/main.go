@@ -12,15 +12,16 @@ import (
 func main() {
 	addr := flag.String("listen", "0.0.0.0:9001", "Endpoint address")
 	flag.Parse()
-	store := NewAccountStore()
-	for i := 0; i < 20; i++ {
-		go store.HandleTransactions()
+	if err := services.SetOpenFilesLimit(40000); err != nil {
+		log.Fatalln(err)
 	}
 
-	EnableTransactionLogging()
+	store := NewAccountStore(1000, 200)
+
 	services.EnableResponseLogging()
 
 	mux := mux.NewRouter()
+	mux.HandleFunc("/stats", store.show_stats).Methods("GET")
 	mux.HandleFunc("/account/{id}", store.show_account).Methods("GET")
 	mux.HandleFunc("/account/{id}/deposit", store.handle_deposit).Methods("POST").MatcherFunc(services.MatchFormKeys("value"))
 	mux.HandleFunc("/account/{id}/transfer", store.handle_transfer).Methods("POST").MatcherFunc(services.MatchFormKeys("value", "target"))
@@ -29,7 +30,7 @@ func main() {
 	mux.HandleFunc("/transaction/{id}/revert", store.revert_transaction).Methods("POST")
 	mux.HandleFunc("/transaction/{id}/commit", store.commit_transaction).Methods("POST")
 
-	log.Println("Running on " + *addr)
+	services.L.Warnf("Running on " + *addr)
 	if err := http.ListenAndServe(*addr, mux); err != nil {
 		log.Fatal(err)
 	}

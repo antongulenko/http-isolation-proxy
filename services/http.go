@@ -1,25 +1,24 @@
 package services
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
-	"os"
 	"strings"
 
 	"github.com/gorilla/mux"
 )
 
 var (
-	response_logger *log.Logger
+	response_logger = Logger{Prefix: "HTTP "}
 	PrettyJson      = true
 )
 
 func EnableResponseLogging() {
-	response_logger = log.New(os.Stderr, "", log.LstdFlags)
+	response_logger.Enable(L.Level)
 }
 
 func Http_respond_json(w http.ResponseWriter, r *http.Request, value interface{}) {
@@ -38,10 +37,12 @@ func Http_respond_json(w http.ResponseWriter, r *http.Request, value interface{}
 }
 
 func http_log(r *http.Request, code int, note string) {
-	if note != "" {
-		note = ": " + note
+	if response_logger.Enabled() {
+		if note != "" {
+			note = ": " + note
+		}
+		response_logger.Logf("%v: %v, %v%s", r.URL, code, http.StatusText(code), note)
 	}
-	response_logger.Printf("%v: %v, %v%s\n", r.URL, code, http.StatusText(code), note)
 }
 
 func Http_respond_error(w http.ResponseWriter, r *http.Request, err string, code int) {
@@ -183,5 +184,25 @@ func Http_post_string(the_url string, data url.Values) (string, error) {
 		return "", err
 	} else {
 		return string(data), nil
+	}
+}
+
+func MakeHttpResponse(req *http.Request, code int, bodyContent string) *http.Response {
+	var body bytes.Buffer
+	body.WriteString(bodyContent)
+	return &http.Response{
+		Status:           http.StatusText(code),
+		StatusCode:       code,
+		Proto:            req.Proto,
+		ProtoMajor:       req.ProtoMajor,
+		ProtoMinor:       req.ProtoMinor,
+		Request:          req,
+		Body:             ioutil.NopCloser(&body),
+		ContentLength:    int64(body.Len()),
+		Close:            false,
+		Header:           nil,
+		Trailer:          nil,
+		TransferEncoding: nil,
+		TLS:              nil,
 	}
 }

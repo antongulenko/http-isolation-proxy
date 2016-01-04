@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -31,7 +30,7 @@ func (shop *Shop) LoopScanOrders(ids chan<- string) {
 func (shop *Shop) scanOrders(ids chan<- string) (result uint) {
 	open_orders, err := shop.redis.Cmd("smembers", open_orders_key).List()
 	if err != nil {
-		shop.log("Error retrieving list of open orders: %v", err)
+		services.L.Logf("Error retrieving list of open orders: %v", err)
 		return
 	}
 	for _, order_id := range open_orders {
@@ -57,22 +56,22 @@ func (shop *Shop) processOrder(order_id string) {
 
 	if err := lock.Lock(); err != nil {
 		// Lock failed, somebody else is processing the order
-		shop.trace("Locking order for processing failed: %v", err)
+		services.L.Tracef("Locking order for processing failed: %v", err)
 		return
 	}
 	defer func() {
 		if err := lock.Unlock(); err != nil {
-			log.Println("Unlocking order failed: %v\n", err)
+			services.L.Warnf("Unlocking order failed: %v\n", err)
 		}
 	}()
 
 	order := shop.MakeOrder(order_id)
 	existed, err := order.LoadExisting()
 	if err != nil {
-		shop.log("Error fetching order %v: %v", order_id, err)
+		services.L.Logf("Error fetching order %v: %v", order_id, err)
 		return
 	} else if !existed {
-		shop.log("Order locked for processing not found: %v", order_id)
+		services.L.Logf("Order locked for processing not found: %v", order_id)
 		return
 	}
 	shop.doProcessOrder(order)
@@ -81,7 +80,7 @@ func (shop *Shop) processOrder(order_id string) {
 func (shop *Shop) doProcessOrder(order *Order) {
 	item, err := catalogApi.GetItem(shop.catalogEndpoint, order.Item)
 	if err != nil {
-		shop.log("Failed to retrieve item '%s' for order processing: %v", order.Item, err)
+		services.L.Logf("Failed to retrieve item '%s' for order processing: %v", order.Item, err)
 		return
 	}
 	if order.assertShipment(item) &&
@@ -97,12 +96,12 @@ func (order *Order) assertShipment(item *catalogApi.Item) bool {
 	if order.ShipmentId == "" {
 		id, err := catalogApi.ShipItem(order.shop.catalogEndpoint, order.Item, order.User, order.Quantity, order.Timestamp)
 		if err != nil {
-			order.shop.log("Failed to create item shipment: %v", err)
+			services.L.Logf("Failed to create item shipment: %v", err)
 			return false
 		}
 		order.ShipmentId = id
 		if err := order.Save(); err != nil {
-			order.shop.log("Failed to store shipment ID for order: %v", err)
+			services.L.Logf("Failed to store shipment ID for order: %v", err)
 			return false
 		}
 	}
@@ -114,12 +113,12 @@ func (order *Order) assertPayment(item *catalogApi.Item) bool {
 		totalCost := float64(order.Quantity) * item.Cost
 		id, err := paymentApi.CreatePayment(order.shop.paymentEndpoint, order.User, totalCost, order.Timestamp)
 		if err != nil {
-			order.shop.log("Failed to create payment: %v", err)
+			services.L.Logf("Failed to create payment: %v", err)
 			return false
 		}
 		order.PaymentId = id
 		if err := order.Save(); err != nil {
-			order.shop.log("Failed to store payment ID for order: %v", err)
+			services.L.Logf("Failed to store payment ID for order: %v", err)
 			return false
 		}
 	}
@@ -138,7 +137,7 @@ func (order *Order) checkShipmentStatus(expectedStatus catalogApi.ShipmentStatus
 	if shipmentStatus := order.shipmentStatus(); shipmentStatus == "" {
 		return false
 	} else if shipmentStatus != expectedStatus {
-		order.shop.log("Shipment %v did not change to status %v (instead %v)", order.ShipmentId, expectedStatus, shipmentStatus)
+		services.L.Logf("Shipment %v did not change to status %v (instead %v)", order.ShipmentId, expectedStatus, shipmentStatus)
 		return false
 	}
 	return true
@@ -211,23 +210,23 @@ func (order *Order) checkError(err error) bool {
 		order.Cancel(err)
 		return true
 	}
-	order.shop.log("Error processing order %v: %v", order.id, err)
+	services.L.Logf("Error processing order %v: %v", order.id, err)
 	return true
 }
 
 func (order *Order) Finalize() {
-	order.shop.log("Finalizing order %v", order.id)
+	services.L.Logf("Finalizing order %v", order.id)
 	logStr := "Order processed successfully"
 	if err := order.doCancel(true, logStr); err != nil {
-		order.shop.log("Finalizing order %v failed: %v", order.id, err)
+		services.L.Logf("Finalizing order %v failed: %v", order.id, err)
 	}
 }
 
 func (order *Order) Cancel(cause error) {
-	order.shop.log("Cancelling order %v because of: %v", order.id, cause)
+	services.L.Logf("Cancelling order %v because of: %v", order.id, cause)
 	logStr := fmt.Sprintf("Cancelling because of: %v", cause)
 	if err := order.doCancel(false, logStr); err != nil {
-		order.shop.log("Cancelling order %v failed: %v", order.id, err)
+		services.L.Logf("Cancelling order %v failed: %v", order.id, err)
 	}
 }
 

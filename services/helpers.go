@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
-	"log"
 	"math"
+	"syscall"
 )
 
 func UintBytes(value uint64) []byte {
@@ -45,10 +45,18 @@ func MakeHash(data ...interface{}) string {
 		case uint64:
 			bytes = UintBytes(val)
 		default:
-			log.Printf("Cannot convert %T to []byte: %v\n", value, value)
+			L.Warnf("Cannot convert %T to []byte: %v\n", value, value)
 			bytes = ([]byte)(fmt.Sprintf("%v", value))
 		}
 		h.Write(bytes)
 	}
 	return base64.URLEncoding.EncodeToString(h.Sum(nil))
+}
+
+func SetOpenFilesLimit(ulimit uint64) error {
+	rLimit := syscall.Rlimit{
+		Max: ulimit,
+		Cur: ulimit,
+	}
+	return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rLimit)
 }

@@ -51,7 +51,7 @@ func main() {
 	mux.HandleFunc("/shipment/{id}/commit", catalog.commit_shipment).Methods("POST")
 	mux.HandleFunc("/shipment/{id}/cancel", catalog.cancel_shipment).Methods("POST")
 	mux.HandleFunc("/shipment/{id}/deliver", catalog.deliver_shipment).Methods("POST")
-	log.Println("Running on " + *addr)
+	services.L.Warnf("Running on " + *addr)
 	if err := http.ListenAndServe(*addr, mux); err != nil {
 		log.Fatal(err)
 	}

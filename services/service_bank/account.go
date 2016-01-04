@@ -11,7 +11,6 @@ import (
 
 const (
 	transaction_processing_timeout = 3 * time.Second
-	transaction_queue_size         = 50
 )
 
 type AccountStore struct {
@@ -21,9 +20,16 @@ type AccountStore struct {
 	transactions     map[string]*Transaction
 }
 
+func (store *AccountStore) Stats() map[string]int {
+	result := make(map[string]int)
+	result["transaction_queue"] = len(store.transactionQueue)
+	result["num_transactions"] = len(store.transactions)
+	result["num_accounts"] = len(store.accounts)
+	return result
+}
+
 type Account struct {
 	bankApi.HttpAccount
-
 	lock sync.Mutex
 }
 
@@ -34,12 +40,16 @@ func (account *Account) String() string {
 	return account.Username
 }
 
-func NewAccountStore() *AccountStore {
-	return &AccountStore{
+func NewAccountStore(transaction_queue int, transaction_workers int) *AccountStore {
+	store := &AccountStore{
 		accounts:         make(map[string]*Account),
-		transactionQueue: make(chan *Transaction, transaction_queue_size),
+		transactionQueue: make(chan *Transaction, transaction_queue),
 		transactions:     make(map[string]*Transaction),
 	}
+	for i := 0; i < transaction_workers; i++ {
+		go store.handleTransactions()
+	}
+	return store
 }
 
 func (store *AccountStore) NewTransaction(account *Account, value float64, targetAccount *Account) *Transaction {
@@ -68,7 +78,7 @@ func (store AccountStore) GetAccount(username string) *Account {
 	}
 }
 
-func (store *AccountStore) HandleTransactions() {
+func (store *AccountStore) handleTransactions() {
 	for {
 		trans := <-store.transactionQueue
 		store.handleTransaction(trans)

@@ -25,8 +25,6 @@ func launchOrderProcessing(shop *Shop) {
 func main() {
 	addr := flag.String("listen", "0.0.0.0:9004", "Endpoint address")
 	redisEndpoint := flag.String("redis", "127.0.0.1:6379", "Redis endpoint")
-	logEnabled := flag.Bool("log", true, "Log errors during background processing of orders")
-	traceEnabled := flag.Bool("trace", false, "Log trace events during background processing of orders")
 	paymentEndpoint := "localhost:9002"
 	catalogEndpoint := "localhost:9003"
 	flag.Parse()
@@ -46,8 +44,6 @@ func main() {
 		redisLockValue:  *addr, // Should be unique and constant per endpoint
 		catalogEndpoint: catalogEndpoint,
 		paymentEndpoint: paymentEndpoint,
-		LogEnabled:      *logEnabled,
-		TraceEnabled:    *traceEnabled,
 	}
 	launchOrderProcessing(shop)
 
@@ -57,7 +53,7 @@ func main() {
 	mux.HandleFunc("/order", shop.order_item).Methods("POST").MatcherFunc(services.MatchFormKeys("user", "item", "qty"))
 	mux.HandleFunc("/orders/{user}", shop.show_orders).Methods("GET")
 
-	log.Println("Running on " + *addr)
+	services.L.Warnf("Running on " + *addr)
 	if err := http.ListenAndServe(*addr, mux); err != nil {
 		log.Fatal(err)
 	}

@@ -2,18 +2,10 @@ package main
 
 import (
 	"fmt"
-	"log"
-	"os"
 	"sync"
-)
 
-var (
-	transaction_logger *log.Logger
+	"github.com/antongulenko/http-isolation-proxy/services"
 )
-
-func EnableTransactionLogging() {
-	transaction_logger = log.New(os.Stderr, "", log.LstdFlags)
-}
 
 const (
 	TransactionPending = TransactionState(iota)
@@ -75,7 +67,7 @@ func (trans *Transaction) String() string {
 func (trans *Transaction) setState(state TransactionState) {
 	trans.state = state
 	trans.State = state.String()
-	transaction_logger.Printf("%v\n", trans)
+	services.L.Tracef("%v\n", trans)
 }
 
 func (trans *Transaction) setError(err string) {
