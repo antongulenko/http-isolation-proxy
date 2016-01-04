@@ -23,7 +23,6 @@ func main() {
 	addr := flag.String("listen", "0.0.0.0:9003", "Endpoint address")
 	redisEndpoint := flag.String("redis", "127.0.0.1:6379", "Redis endpoint")
 	flag.Parse()
-
 	services.EnableResponseLogging()
 
 	redisClient, err := services.ConnectRedis(*redisEndpoint)

@@ -7,10 +7,14 @@ import (
 
 	"github.com/antongulenko/http-isolation-proxy/proxy"
 	"github.com/antongulenko/http-isolation-proxy/services"
+	"github.com/go-ini/ini"
+	"github.com/kardianos/osext"
 )
 
 const (
-	stats_addr = ":9006"
+	stats_path   = "/stats"
+	runtime_path = "/runtime"
+	open_files   = 40000
 )
 
 func check(err error) {
@@ -19,16 +23,9 @@ func check(err error) {
 	}
 }
 
-func handle(p *proxy.IsolationProxy, name string, addr string) {
-	check(p.Handle(name, addr))
-}
-
-func main() {
-	flag.Parse()
-	check(services.SetOpenFilesLimit(40000))
-
+func loadServiceRegistry(confIni *ini.File) proxy.LocalRegistry {
 	reg := make(proxy.LocalRegistry)
-	service := func(name string, endpoints ...string) {
+	addService := func(name string, endpoints ...string) {
 		for _, addr := range endpoints {
 			endpoint := &proxy.Endpoint{
 				Service: name,
@@ -39,22 +36,40 @@ func main() {
 		}
 	}
 
-	service("payment", "localhost:8000", "localhost:8001", "localhost:8002")
-	service("shop", "localhost:8003", "localhost:8004", "localhost:8005")
-	service("catalog", "localhost:8006", "localhost:8007", "localhost:8008")
-	service("bank", "localhost:8009")
+	confSection, err := confIni.GetSection("backends")
+	check(err)
+	for _, service := range confSection.Keys() {
+		addService(service.Name(), service.Strings(",")...)
+	}
+	return reg
+}
+
+func handleServices(confIni *ini.File, p *proxy.IsolationProxy) {
+	confSection, err := confIni.GetSection("services")
+	check(err)
+	for _, service := range confSection.Keys() {
+		go func(service *ini.Key) {
+			check(p.Handle(service.Name(), service.String()))
+		}(service)
+	}
+}
+
+func main() {
+	execFolder, err := osext.ExecutableFolder()
+	check(err)
+	configFile := flag.String("conf", execFolder+"/isolator.ini", "Config containing isolated external services")
+	statsAddr := flag.String("stats", ":7777", "Address to serve statistics (HTTP+JSON on "+stats_path+" and "+runtime_path+")")
+	flag.Parse()
+	check(services.SetOpenFilesLimit(open_files))
+	confIni, err := ini.Load(*configFile)
+	check(err)
 
 	p := &proxy.IsolationProxy{
-		Registry: reg,
+		Registry: loadServiceRegistry(confIni),
 	}
 	services.EnableResponseLogging()
-	p.ServeStats("/stats")
-	proxy.ServeRuntimeStats("/runtime")
-
-	go handle(p, "bank", "localhost:9001")
-	go handle(p, "payment", "localhost:9002")
-	go handle(p, "catalog", "localhost:9003")
-	go handle(p, "shop", "localhost:9004")
-	go handle(p, "test", "localhost:9005") // No backends
-	check(http.ListenAndServe(stats_addr, nil))
+	p.ServeStats(stats_path)
+	proxy.ServeRuntimeStats(runtime_path)
+	handleServices(confIni, p)
+	check(http.ListenAndServe(*statsAddr, nil))
 }

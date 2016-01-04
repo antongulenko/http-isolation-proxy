@@ -25,11 +25,11 @@ func launchOrderProcessing(shop *Shop) {
 func main() {
 	addr := flag.String("listen", "0.0.0.0:9004", "Endpoint address")
 	redisEndpoint := flag.String("redis", "127.0.0.1:6379", "Redis endpoint")
-	paymentEndpoint := "localhost:9002"
-	catalogEndpoint := "localhost:9003"
+	paymentEndpoint := flag.String("payment", "localhost:9002", "Endpoint for payment service")
+	catalogEndpoint := flag.String("catalog", "localhost:9003", "Endpoint for catalog service")
 	flag.Parse()
-
 	services.EnableResponseLogging()
+
 	redisClient, err := services.ConnectRedis(*redisEndpoint)
 	if err != nil {
 		log.Fatalln(err)
@@ -42,13 +42,12 @@ func main() {
 	shop := &Shop{
 		redis:           redisClient,
 		redisLockValue:  *addr, // Should be unique and constant per endpoint
-		catalogEndpoint: catalogEndpoint,
-		paymentEndpoint: paymentEndpoint,
+		catalogEndpoint: *catalogEndpoint,
+		paymentEndpoint: *paymentEndpoint,
 	}
 	launchOrderProcessing(shop)
 
 	mux := mux.NewRouter()
-
 	mux.HandleFunc("/shop", shop.show_items).Methods("GET")
 	mux.HandleFunc("/order", shop.order_item).Methods("POST").MatcherFunc(services.MatchFormKeys("user", "item", "qty"))
 	mux.HandleFunc("/orders/{user}", shop.show_orders).Methods("GET")
