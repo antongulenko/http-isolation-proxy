@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"log"
+	"net"
 	"net/http"
 
 	"github.com/antongulenko/http-isolation-proxy/proxy"
@@ -47,9 +48,14 @@ func loadServiceRegistry(confIni *ini.File) proxy.LocalRegistry {
 func isRunningLocally(service string, serviceEndpoint string, reg proxy.Registry) bool {
 	if endpoints, err := reg.Endpoints(service); err == nil {
 		for _, endpoint := range endpoints {
-			// TODO should compare IP/host and port
-			if endpoint.Host == serviceEndpoint {
-				return true
+			localPort, err := endpoint.LocalPort()
+			check(err)
+			if localPort != "" {
+				_, port, err := net.SplitHostPort(serviceEndpoint)
+				check(err)
+				if port == localPort {
+					return true
+				}
 			}
 		}
 	}

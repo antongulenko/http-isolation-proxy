@@ -1,6 +1,8 @@
 package proxy
 
 import (
+	"bytes"
+	"fmt"
 	"net"
 	"net/url"
 	"sync"
@@ -126,4 +128,30 @@ func (endpoint *Endpoint) setActive() {
 	services.L.Warnf("%v active", endpoint)
 	endpoint.active = true
 	endpoint.onceInactive = sync.Once{} // Reset for next setInactive call
+}
+
+// Return empty string if the endpoint is not the local host
+func (endpoint *Endpoint) LocalPort() (string, error) {
+	host, port, err := net.SplitHostPort(endpoint.Host)
+	if err != nil {
+		return "", err
+	}
+	ip, err := net.ResolveIPAddr("ip", host)
+	if err != nil {
+		return "", err
+	}
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "", err
+	}
+	for _, addr := range addrs {
+		if ipAddr, ok := addr.(*net.IPNet); ok {
+			if 0 == bytes.Compare(ipAddr.IP, ip.IP) {
+				return port, nil
+			}
+		} else {
+			fmt.Printf("Type was %T\n", addr)
+		}
+	}
+	return "", nil
 }
