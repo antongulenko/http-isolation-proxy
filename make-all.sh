@@ -19,6 +19,8 @@ go $go_command "$prefix/service_payment/paymentApi"
 go $go_command "$prefix/service_payment"
 go $go_command "$prefix/service_shop/shopApi"
 go $go_command "$prefix/service_shop"
+
+go $go_command "$prefix/service_verify"
 go $go_command "$prefix/service_user"
 
 go $go_command "$base/proxy"

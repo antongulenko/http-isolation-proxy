@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"math"
@@ -37,8 +38,11 @@ func round(val float64) float64 {
 }
 
 func main() {
-	bank := bankApi.NewHttpBank("localhost:9001")
-	shopEndpoint := "localhost:9004"
+	bankEndpoint := flag.String("bank", "localhost:9001", "Bank endpoint")
+	var shopEndpoint string
+	flag.StringVar(&shopEndpoint, "shop", "localhost:9004", "Shop endpoint")
+	flag.Parse()
+	bank := bankApi.NewHttpBank(*bankEndpoint)
 
 	allItems, err := shopApi.AllItems(shopEndpoint)
 
