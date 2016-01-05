@@ -1,8 +1,6 @@
 package proxy
 
 import (
-	"bytes"
-	"fmt"
 	"net"
 	"net/url"
 	"sync"
@@ -140,17 +138,24 @@ func (endpoint *Endpoint) LocalPort() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	addrs, err := net.InterfaceAddrs()
+	ifaces, err := net.Interfaces()
 	if err != nil {
 		return "", err
 	}
-	for _, addr := range addrs {
-		if ipAddr, ok := addr.(*net.IPNet); ok {
-			if 0 == bytes.Compare(ipAddr.IP, ip.IP) {
-				return port, nil
+	for _, iface := range ifaces {
+		addrs, err := iface.Addrs()
+		if err != nil {
+			return "", err
+		}
+		for _, addr := range addrs {
+			if interfaceAddr, ok := addr.(*net.IPNet); ok {
+				if iface.Flags&net.FlagLoopback != 0 && interfaceAddr.Contains(ip.IP) {
+					return port, nil
+				}
+				if interfaceAddr.IP.Equal(ip.IP) {
+					return port, nil
+				}
 			}
-		} else {
-			fmt.Printf("Type was %T\n", addr)
 		}
 	}
 	return "", nil
