@@ -44,13 +44,30 @@ func loadServiceRegistry(confIni *ini.File) proxy.LocalRegistry {
 	return reg
 }
 
+func isRunningLocally(service string, serviceEndpoint string, reg proxy.Registry) bool {
+	if endpoints, err := reg.Endpoints(service); err == nil {
+		for _, endpoint := range endpoints {
+			// TODO should compare IP/host and port
+			if endpoint.Host == serviceEndpoint {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func handleServices(confIni *ini.File, p *proxy.IsolationProxy) {
 	confSection, err := confIni.GetSection("services")
 	check(err)
 	for _, service := range confSection.Keys() {
-		go func(service *ini.Key) {
-			check(p.Handle(service.Name(), service.String()))
-		}(service)
+		if !isRunningLocally(service.Name(), service.String(), p.Registry) {
+			go func(service *ini.Key) {
+				check(p.Handle(service.Name(), service.String()))
+			}(service)
+		} else {
+			// If the service should be running locally on the same port, don't proxy it
+			services.L.Warnf("Not handling %s on %s: should be running locally", service.Name(), service.String())
+		}
 	}
 }
 
