@@ -52,7 +52,7 @@ func (catalog *Catalog) MakeItem(name string, initialStock uint64, cost float64)
 			LockName:   lock_prefix + item_prefix + name,
 			LockValue:  catalog.redisLockValue,
 			Expiration: lock_expiration,
-			Retry:      item_lock_retries, // This is a frequent lock, do a feq retries
+			Retry:      item_lock_retries, // This is a frequent lock, do a few retries
 		},
 	}
 	item.StoredObject = services.StoredObject{item}
@@ -101,5 +101,44 @@ func (catalog *Catalog) GetItem(name string) (*Item, error) {
 		return nil, err
 	} else {
 		return item, nil
+	}
+}
+
+func (catalog *Catalog) RefillItems(timeout time.Duration, refills map[string]uint64) {
+	for {
+		time.Sleep(timeout)
+		services.L.Warnf("Refilling items...")
+		for itemName, refill := range refills {
+			item, err := catalog.GetItem(itemName)
+			if err != nil {
+				services.L.Warnf("Error getting item %v for refill: %v", itemName, err)
+				continue
+			}
+			catalog.refillItem(item, refill)
+		}
+	}
+}
+
+func (catalog *Catalog) refillItem(item *Item, refill uint64) {
+	// Lock the item we are about to refill
+	if err := item.redisLock.Lock(); err != nil {
+		services.L.Warnf("Failed to lock item for refill: %v", err)
+		return
+	}
+	defer func() {
+		if err := item.redisLock.Unlock(); err != nil {
+			services.L.Warnf("Error releasing redis lock for item for refill:", err)
+		}
+	}()
+
+	if item.Stock == 0 {
+		item.Stock = refill
+		if err := item.Save(); err == nil {
+			services.L.Warnf("Refilled item %s to %v", item.Name, refill)
+		} else {
+			services.L.Warnf("Error saving item %v after refilling to %v: %v", item.Name, refill, err)
+		}
+	} else {
+		services.L.Warnf("Not refilling %s, stock is still %v", item.Name, item.Stock)
 	}
 }

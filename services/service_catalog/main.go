@@ -4,9 +4,14 @@ import (
 	"flag"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/antongulenko/http-isolation-proxy/services"
 	"github.com/gorilla/mux"
+)
+
+const (
+	refill_timeout = 5 * time.Minute
 )
 
 func fillDefaultCatalog(catalog *Catalog) error {
@@ -15,7 +20,7 @@ func fillDefaultCatalog(catalog *Catalog) error {
 		catalog.MakeItem("Toaster", 1000, 12.99),
 		catalog.MakeItem("Laptop", 500, 499.00),
 		catalog.MakeItem("TV", 100, 1099.00),
-		catalog.MakeItem("Spaceship", 1, 5000000000),
+		catalog.MakeItem("Spaceship", 0, 5000000000),
 	})
 }
 
@@ -41,6 +46,13 @@ func main() {
 	if err := fillDefaultCatalog(catalog); err != nil {
 		log.Fatalln("Error filling default catalog:", err)
 	}
+	go catalog.RefillItems(refill_timeout, map[string]uint64{
+		"DVD":       500,
+		"Toaster":   100,
+		"Laptop":    50,
+		"TV":        10,
+		"Spaceship": 1,
+	})
 
 	mux := mux.NewRouter()
 	mux.HandleFunc("/items", catalog.show_items).Methods("GET")
