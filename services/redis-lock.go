@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/pborman/uuid"
 )
 
 var LockFailed = errors.New("Failed to acquire lock")
