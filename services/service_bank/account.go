@@ -6,7 +6,7 @@ import (
 
 	"github.com/antongulenko/http-isolation-proxy/services/service_bank/bankApi"
 
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/pborman/uuid"
 )
 
 const (

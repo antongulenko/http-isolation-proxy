@@ -1,5 +1,5 @@
 github.com/bradfitz/gomemcache/memcache master
-code.google.com/p/go-uuid/uuid
+github.com/pborman/uuid
 github.com/gorilla/mux
 github.com/mediocregopher/radix.v2
 github.com/go-ini/ini v1.8.5

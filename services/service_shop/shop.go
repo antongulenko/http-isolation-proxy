@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	"code.google.com/p/go-uuid/uuid"
+	"github.com/pborman/uuid"
 
 	"github.com/antongulenko/http-isolation-proxy/services"
 	"github.com/antongulenko/http-isolation-proxy/services/service_catalog/catalogApi"
