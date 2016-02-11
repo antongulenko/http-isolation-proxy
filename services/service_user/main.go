@@ -5,9 +5,15 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"os/signal"
 	"time"
 
 	"github.com/antongulenko/http-isolation-proxy/services"
+)
+
+var (
+	fixKeyboard bool
+	pool        *Pool
 )
 
 const (
@@ -15,48 +21,68 @@ const (
 )
 
 func main() {
-	defer resetKeyboard()
-
 	num_users := flag.Uint("users", 5, "Number of simulated people")
 	bank := flag.String("bank", "localhost:9001", "Bank endpoint")
 	timeout := flag.Duration("timeout", 0, "Timeout for automatically stopping load generation")
+	dynamicUsers := flag.Bool("dynamic", false, "Enable changing # of active users with arrow keys. CTRL-C breaks console")
 	var shops services.StringSlice
 	flag.Var(&shops, "shop", "Shop endpoint(s)")
 	flag.Parse()
 	if len(shops) == 0 {
 		log.Fatalln("Specify at least one -shop")
 	}
-	pool := NewPool(*bank, shops)
+	pool = NewPool(*bank, shops)
 	pool.Start(int(*num_users))
 
 	if err := services.SetOpenFilesLimit(open_files_limit); err != nil {
 		services.L.Warnf("Failed to set open files limit to %v: %v", open_files_limit, err)
 	}
 
-	go readKeyboard(func(b byte) {
-		switch b {
-		case 65: // Up
-			pool.StartOne()
-		case 66: // Down
-			pool.PauseOne()
-		case 67: // Right
-			pool.Start(10)
-		case 68: // Left
-			pool.Pause(10)
-		case 10: // Enter
-			pool.Terminate()
-		}
-	})
+	if *dynamicUsers {
+		fixKeyboard = true
+		go readKeyboard(func(b byte) {
+			switch b {
+			case 65: // Up
+				pool.StartOne()
+			case 66: // Down
+				pool.PauseOne()
+			case 67: // Right
+				pool.Start(10)
+			case 68: // Left
+				pool.Pause(10)
+			case 10: // Enter
+				terminate()
+			}
+		})
+	}
+	onInterrupt(terminate)
 	if *timeout > 0 {
 		services.L.Warnf("Terminating automatically after %v", timeout)
 		time.AfterFunc(*timeout,
 			func() {
 				services.L.Warnf("Timer of %v expired. Terminating...", timeout)
-				pool.Terminate()
+				terminate()
 			})
 	}
 	pool.Wait()
 	pool.PrintStats()
+}
+
+func terminate() {
+	if fixKeyboard {
+		resetKeyboard()
+	}
+	pool.Terminate()
+}
+
+func onInterrupt(handler func()) {
+	interrupt := make(chan os.Signal, 1)
+	signal.Notify(interrupt, os.Interrupt)
+	go func() {
+		defer signal.Stop(interrupt)
+		<-interrupt
+		handler()
+	}()
 }
 
 func readKeyboard(ex func(b byte)) {
