@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"os"
 	"strings"
 
 	"github.com/antongulenko/http-isolation-proxy/services/service_bank/bankApi"
@@ -43,6 +44,7 @@ func main() {
 	flag.StringVar(&shopEndpoint, "shop", "localhost:9004", "Shop endpoint")
 	flag.Parse()
 	bank := bankApi.NewHttpBank(*bankEndpoint)
+	inconsistent := false
 
 	allItems, err := shopApi.AllItems(shopEndpoint)
 
@@ -56,9 +58,11 @@ func main() {
 		expectedTotal := initial + item.Refills
 		if total != expectedTotal {
 			fmt.Printf("%v inconsistent: %v + %v + %v = %v, expected %v + %v = %v\n", item.Name, item.Reserved, item.Shipped, item.Stock, total, initial, item.Refills, expectedTotal)
+			inconsistent = true
 		}
 		if item.Reserved != 0 {
 			fmt.Printf("%v still has %v reserved items\n", item.Name, item.Reserved)
+			inconsistent = true
 		}
 		totalShipped += item.Shipped
 		totalEarned += float64(item.Shipped) * item.Cost
@@ -83,12 +87,14 @@ func main() {
 				cancelledOrders++
 			} else {
 				fmt.Println("Unknown order status:", order.Status)
+				inconsistent = true
 			}
 		}
 	}
 	fmt.Println("Orders processed:", processedOrders, "orders cancelled:", cancelledOrders)
 	if totalShipped != totalShippedOrders {
 		fmt.Printf("Inconsistent: shipped %v, shipped orders %v\n", totalShipped, totalShippedOrders)
+		inconsistent = true
 	}
 
 	balance, err := bank.Balance("store")
@@ -100,6 +106,7 @@ func main() {
 
 	if balance != totalEarned {
 		fmt.Printf("Inconsistent earnings bank vs. items. Expected %v, have %v\n", totalEarned, balance)
+		inconsistent = true
 		if balance > totalEarned {
 			fmt.Println(balance-totalEarned, "too much")
 		} else {
@@ -112,7 +119,14 @@ func main() {
 			fmt.Println(balance-totalEarnedOrders, "too much")
 		} else {
 			fmt.Println("Missing", totalEarnedOrders-balance)
+			inconsistent = true
 		}
 	}
 	fmt.Printf("Total shipped items %v, total earnings %v\n", totalShipped, totalEarned)
+
+	if inconsistent {
+		os.Exit(1)
+	} else {
+		os.Exit(0)
+	}
 }
