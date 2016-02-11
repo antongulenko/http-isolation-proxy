@@ -133,6 +133,7 @@ func (catalog *Catalog) refillItem(item *Item, refill uint64) {
 
 	if item.Stock == 0 {
 		item.Stock = refill
+		item.Refills += refill
 		if err := item.Save(); err == nil {
 			services.L.Warnf("Refilled item %s to %v", item.Name, refill)
 		} else {

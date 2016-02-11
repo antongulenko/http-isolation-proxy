@@ -18,12 +18,12 @@ func check(err error) {
 }
 
 var (
-	totalItems = map[string]uint64{
+	initialItems = map[string]uint64{
 		"DVD":       5000,
 		"Toaster":   1000,
 		"Laptop":    500,
 		"TV":        100,
-		"Spaceship": 1,
+		"Spaceship": 0,
 	}
 	num_users = 1000
 )
@@ -52,9 +52,10 @@ func main() {
 	for _, item := range allItems {
 		itemMap[item.Name] = item
 		total := item.Reserved + item.Shipped + item.Stock
-		expectedTotal := totalItems[item.Name]
+		initial := initialItems[item.Name]
+		expectedTotal := initial + item.Refills
 		if total != expectedTotal {
-			fmt.Printf("%v inconsistent: %v + %v + %v = %v, expected %v\n", item.Name, item.Reserved, item.Shipped, item.Stock, total, expectedTotal)
+			fmt.Printf("%v inconsistent: %v + %v + %v = %v, expected %v + %v = %v\n", item.Name, item.Reserved, item.Shipped, item.Stock, total, initial, item.Refills, expectedTotal)
 		}
 		if item.Reserved != 0 {
 			fmt.Printf("%v still has %v reserved items\n", item.Name, item.Reserved)

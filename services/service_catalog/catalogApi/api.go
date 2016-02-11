@@ -12,11 +12,12 @@ type Item struct {
 	Stock    uint64  `json:"stock"`
 	Reserved uint64  `json:"reserved"`
 	Shipped  uint64  `json:"shipped"`
+	Refills  uint64  `json:"refills"`
 	Cost     float64 `json:"cost"`
 }
 
 func (item *Item) String() string {
-	return fmt.Sprintf("%s (%v, %v stock, %v reserved, %v shipped)", item.Name, item.Cost, item.Stock, item.Reserved, item.Shipped)
+	return fmt.Sprintf("%s (%v, %v stock, %v reserved, %v shipped, %v refills)", item.Name, item.Cost, item.Stock, item.Reserved, item.Shipped, item.Refills)
 }
 
 type ShipmentStatus string
