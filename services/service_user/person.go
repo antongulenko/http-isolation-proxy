@@ -30,6 +30,10 @@ type Person struct {
 	monthlyPay float64
 	Name       string
 
+	ShopRequests uint64
+	BankRequests uint64
+	TotalErrors  uint64
+
 	running bool
 	paused  bool
 	cond    sync.Cond
@@ -116,6 +120,7 @@ func (person *Person) error(err error) bool {
 	if err == nil {
 		return false
 	} else {
+		person.TotalErrors++
 		services.L.Warnf("%v: %v", person.Name, err)
 		return true
 	}
@@ -123,6 +128,7 @@ func (person *Person) error(err error) bool {
 
 func (person *Person) earn() {
 	_, err := person.bank.Deposit(person.Name, person.monthlyPay)
+	person.BankRequests++
 	services.L.Logf("%v earning %v", person.Name, person.monthlyPay)
 	person.error(err)
 }
@@ -137,6 +143,7 @@ func (person *Person) pickShop() string {
 func (person *Person) shop() {
 	shopEndpoint := person.pickShop()
 	items, err := shopApi.AllItems(shopEndpoint)
+	person.ShopRequests++
 	if person.error(err) {
 		return
 	}
@@ -144,6 +151,7 @@ func (person *Person) shop() {
 	item := items[item_index].Name
 	services.L.Logf("%v ordering %v", person.Name, item)
 	err = shopApi.PlaceOrder(shopEndpoint, person.Name, item, 1)
+	person.ShopRequests++
 	person.error(err)
 }
 

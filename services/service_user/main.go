@@ -56,6 +56,7 @@ func main() {
 			})
 	}
 	pool.Wait()
+	pool.PrintStats()
 }
 
 func readKeyboard(ex func(b byte)) {

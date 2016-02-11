@@ -3,6 +3,7 @@ package main
 import (
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/antongulenko/http-isolation-proxy/services"
 )
@@ -14,6 +15,7 @@ type Pool struct {
 
 	bankEndpoint  string
 	shopEndpoints []string
+	startTime     time.Time
 }
 
 func NewPool(bankEndpoint string, shopEndpoints []string) *Pool {
@@ -35,6 +37,7 @@ func (pool *Pool) Wait() {
 }
 
 func (pool *Pool) Start(num int) {
+	pool.startTime = time.Now()
 	for i := 0; i < num; i++ {
 		pool.StartOne()
 	}
@@ -60,6 +63,21 @@ func (pool *Pool) PauseOne() {
 		pool.active--
 		services.L.Warnf("Paused, now active: %v. Person: %v", pool.active, person)
 	}
+}
+
+func (pool *Pool) PrintStats() {
+	t := time.Now().Sub(pool.startTime)
+	secs := float64(t.Seconds())
+	var bankRequests uint64
+	var shopRequests uint64
+	var totalErrors uint64
+	for _, person := range pool.people {
+		bankRequests += person.BankRequests
+		shopRequests += person.ShopRequests
+		totalErrors += person.TotalErrors
+	}
+	services.L.Warnf("Pool statistics:\nRuntime: %v\nShop Requests: %v\nShop Requests/second: %v\nBank Requests: %v\nBank Requests/second: %v\nTotal Errors: %v",
+		t, shopRequests, float64(shopRequests)/secs, bankRequests, float64(bankRequests)/secs, totalErrors)
 }
 
 func (pool *Pool) addPerson() {
