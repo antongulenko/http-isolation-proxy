@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"time"
 
 	"github.com/antongulenko/http-isolation-proxy/services"
 )
@@ -12,6 +13,7 @@ import (
 func main() {
 	num_users := flag.Uint("users", 5, "Number of simulated people")
 	bank := flag.String("bank", "localhost:9001", "Bank endpoint")
+	timeout := flag.Duration("timeout", 0, "Timeout for automatically stopping load generation")
 	var shops services.StringSlice
 	flag.Var(&shops, "shop", "Shop endpoint(s)")
 	flag.Parse()
@@ -36,6 +38,14 @@ func main() {
 			pool.Terminate()
 		}
 	})
+	if *timeout > 0 {
+		services.L.Warnf("Terminating automatically after %v", timeout)
+		time.AfterFunc(*timeout,
+			func() {
+				services.L.Warnf("Timer of %v expired. Terminating...", timeout)
+				pool.Terminate()
+			})
+	}
 	pool.Wait()
 }
 
