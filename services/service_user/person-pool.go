@@ -12,14 +12,14 @@ type Pool struct {
 	active int
 	wg     sync.WaitGroup
 
-	bankEndpoint string
-	shopEndpoint string
+	bankEndpoint  string
+	shopEndpoints []string
 }
 
-func NewPool(bankEndpoint string, shopEndpoint string) *Pool {
+func NewPool(bankEndpoint string, shopEndpoints []string) *Pool {
 	return &Pool{
-		bankEndpoint: bankEndpoint,
-		shopEndpoint: shopEndpoint,
+		bankEndpoint:  bankEndpoint,
+		shopEndpoints: shopEndpoints,
 	}
 }
 
@@ -63,7 +63,7 @@ func (pool *Pool) PauseOne() {
 }
 
 func (pool *Pool) addPerson() {
-	person := RandomPerson("User"+strconv.Itoa(len(pool.people)), pool.bankEndpoint, pool.shopEndpoint)
+	person := RandomPerson("User"+strconv.Itoa(len(pool.people)), pool.bankEndpoint, pool.shopEndpoints)
 	pool.people = append(pool.people, person)
 	person.Live(&pool.wg)
 }

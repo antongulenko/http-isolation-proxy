@@ -2,22 +2,29 @@ package main
 
 import (
 	"flag"
+	"log"
 	"os"
 	"os/exec"
+
+	"github.com/antongulenko/http-isolation-proxy/services"
 )
 
 func main() {
-	num_users := flag.Uint("users", 10, "Number of simulated people")
+	num_users := flag.Uint("users", 5, "Number of simulated people")
 	bank := flag.String("bank", "localhost:9001", "Bank endpoint")
-	shop := flag.String("shop", "localhost:9004", "Shop endpoint")
+	var shops services.StringSlice
+	flag.Var(&shops, "shop", "Shop endpoint(s)")
 	flag.Parse()
-
-	pool := NewPool(*bank, *shop)
+	if len(shops) == 0 {
+		log.Fatalln("Specify at least one -shop")
+	}
+	pool := NewPool(*bank, shops)
 	pool.Start(int(*num_users))
+
 	defer resetKeyboard()
 	go readKeyboard(func(b byte) {
 		switch b {
-		case 65: // 	Up
+		case 65: // Up
 			pool.StartOne()
 		case 66: // Down
 			pool.PauseOne()

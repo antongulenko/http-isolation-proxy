@@ -24,8 +24,8 @@ const (
 type Person struct {
 	sleepTime time.Duration
 
-	bank         bankApi.Bank
-	shopEndpoint string
+	bank          bankApi.Bank
+	shopEndpoints []string
 
 	monthlyPay float64
 	Name       string
@@ -39,19 +39,19 @@ func (person *Person) String() string {
 	return fmt.Sprintf("%v: sleeps %v, earns %v", person.Name, person.sleepTime, person.monthlyPay)
 }
 
-func RandomPerson(name string, bankEndpoint string, shopEndpoint string) *Person {
+func RandomPerson(name string, bankEndpoint string, shopEndpoints []string) *Person {
 	sleepTime := (time.Duration(rand.Int63n(max_sleep-min_sleep) + min_sleep)) * time.Millisecond
 	monthlyPay := rand.Float64()*max_pay + min_pay
 
 	return &Person{
-		Name:         name,
-		sleepTime:    sleepTime,
-		monthlyPay:   monthlyPay,
-		bank:         bankApi.NewHttpBank(bankEndpoint),
-		shopEndpoint: shopEndpoint,
-		cond:         sync.Cond{L: new(sync.Mutex)},
-		paused:       true,
-		running:      true,
+		Name:          name,
+		sleepTime:     sleepTime,
+		monthlyPay:    monthlyPay,
+		bank:          bankApi.NewHttpBank(bankEndpoint),
+		shopEndpoints: shopEndpoints,
+		cond:          sync.Cond{L: new(sync.Mutex)},
+		paused:        true,
+		running:       true,
 	}
 }
 
@@ -127,15 +127,23 @@ func (person *Person) earn() {
 	person.error(err)
 }
 
+func (person *Person) pickShop() string {
+	num := rand.Int31n(int32(len(person.shopEndpoints)))
+	endpoint := person.shopEndpoints[num]
+	services.L.Tracef("Picked shop endpoint: %v", endpoint)
+	return endpoint
+}
+
 func (person *Person) shop() {
-	items, err := shopApi.AllItems(person.shopEndpoint)
+	shopEndpoint := person.pickShop()
+	items, err := shopApi.AllItems(shopEndpoint)
 	if person.error(err) {
 		return
 	}
 	item_index := rand.Uint32() % uint32(len(items))
 	item := items[item_index].Name
 	services.L.Logf("%v ordering %v", person.Name, item)
-	err = shopApi.PlaceOrder(person.shopEndpoint, person.Name, item, 1)
+	err = shopApi.PlaceOrder(shopEndpoint, person.Name, item, 1)
 	person.error(err)
 }
 
