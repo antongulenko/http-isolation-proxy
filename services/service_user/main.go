@@ -10,7 +10,13 @@ import (
 	"github.com/antongulenko/http-isolation-proxy/services"
 )
 
+const (
+	open_files_limit = 40000
+)
+
 func main() {
+	defer resetKeyboard()
+
 	num_users := flag.Uint("users", 5, "Number of simulated people")
 	bank := flag.String("bank", "localhost:9001", "Bank endpoint")
 	timeout := flag.Duration("timeout", 0, "Timeout for automatically stopping load generation")
@@ -23,7 +29,10 @@ func main() {
 	pool := NewPool(*bank, shops)
 	pool.Start(int(*num_users))
 
-	defer resetKeyboard()
+	if err := services.SetOpenFilesLimit(open_files_limit); err != nil {
+		services.L.Warnf("Failed to set open files limit to %v: %v", open_files_limit, err)
+	}
+
 	go readKeyboard(func(b byte) {
 		switch b {
 		case 65: // Up
