@@ -4,10 +4,20 @@ import (
 	"crypto/sha1"
 	"encoding/base64"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"math"
 	"syscall"
 )
+
+var (
+	ConfiguredOpenFilesLimit uint64
+)
+
+func init() {
+	flag.Uint64Var(&ConfiguredOpenFilesLimit, "ofl", ConfiguredOpenFilesLimit,
+		"Set to >0 for configuring the open files limit (only possible as root)")
+}
 
 func UintBytes(value uint64) []byte {
 	bytes := make([]byte, 8)
@@ -51,6 +61,16 @@ func MakeHash(data ...interface{}) string {
 		h.Write(bytes)
 	}
 	return base64.URLEncoding.EncodeToString(h.Sum(nil))
+}
+
+func ConfigureOpenFilesLimit() {
+	if ConfiguredOpenFilesLimit > 0 {
+		if err := SetOpenFilesLimit(ConfiguredOpenFilesLimit); err != nil {
+			L.Warnf("Failed to set open files limit to %v: %v", ConfiguredOpenFilesLimit, err)
+		} else {
+			L.Logf("Successfully set open files limit to %v", ConfiguredOpenFilesLimit)
+		}
+	}
 }
 
 func SetOpenFilesLimit(ulimit uint64) error {

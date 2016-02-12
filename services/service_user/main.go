@@ -16,10 +16,6 @@ var (
 	pool        *Pool
 )
 
-const (
-	open_files_limit = 40000
-)
-
 func main() {
 	num_users := flag.Uint("users", 5, "Number of simulated people")
 	bank := flag.String("bank", "localhost:9001", "Bank endpoint")
@@ -31,12 +27,9 @@ func main() {
 	if len(shops) == 0 {
 		log.Fatalln("Specify at least one -shop")
 	}
+	services.ConfigureOpenFilesLimit()
 	pool = NewPool(*bank, shops)
 	pool.Start(int(*num_users))
-
-	if err := services.SetOpenFilesLimit(open_files_limit); err != nil {
-		services.L.Warnf("Failed to set open files limit to %v: %v", open_files_limit, err)
-	}
 
 	if *dynamicUsers {
 		fixKeyboard = true

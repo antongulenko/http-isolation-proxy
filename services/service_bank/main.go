@@ -10,13 +10,11 @@ import (
 )
 
 func main() {
+	services.ConfiguredOpenFilesLimit = 40000
 	addr := flag.String("listen", "0.0.0.0:9001", "Endpoint address")
 	flag.Parse()
 	services.EnableResponseLogging()
-
-	if err := services.SetOpenFilesLimit(40000); err != nil {
-		log.Fatalln(err)
-	}
+	services.ConfigureOpenFilesLimit()
 
 	store := NewAccountStore(1000, 200)
 

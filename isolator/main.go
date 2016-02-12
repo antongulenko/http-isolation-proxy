@@ -83,7 +83,8 @@ func main() {
 	configFile := flag.String("conf", execFolder+"/isolator.ini", "Config containing isolated external services")
 	statsAddr := flag.String("stats", ":7777", "Address to serve statistics (HTTP+JSON on "+stats_path+" and "+runtime_path+")")
 	flag.Parse()
-	check(services.SetOpenFilesLimit(open_files))
+	services.ConfigureOpenFilesLimit()
+
 	confIni, err := ini.Load(*configFile)
 	check(err)
 

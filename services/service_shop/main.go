@@ -29,6 +29,7 @@ func main() {
 	catalogEndpoint := flag.String("catalog", "localhost:9003", "Endpoint for catalog service")
 	flag.Parse()
 	services.EnableResponseLogging()
+	services.ConfigureOpenFilesLimit()
 
 	redisClient, err := services.ConnectRedis(*redisEndpoint)
 	if err != nil {

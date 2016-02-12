@@ -29,6 +29,7 @@ func main() {
 	redisEndpoint := flag.String("redis", "127.0.0.1:6379", "Redis endpoint")
 	flag.Parse()
 	services.EnableResponseLogging()
+	services.ConfigureOpenFilesLimit()
 
 	redisClient, err := services.ConnectRedis(*redisEndpoint)
 	if err != nil {

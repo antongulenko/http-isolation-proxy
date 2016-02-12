@@ -16,6 +16,7 @@ func main() {
 	bankEndpoint := flag.String("bank", "localhost:9001", "Endpoint for bank service")
 	flag.Parse()
 	services.EnableResponseLogging()
+	services.ConfigureOpenFilesLimit()
 
 	bank := bankApi.NewHttpBank(*bankEndpoint)
 	redisClient, err := services.ConnectRedis(*redisEndpoint)

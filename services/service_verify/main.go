@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/antongulenko/http-isolation-proxy/services"
 	"github.com/antongulenko/http-isolation-proxy/services/service_bank/bankApi"
 	"github.com/antongulenko/http-isolation-proxy/services/service_shop/shopApi"
 )
@@ -44,6 +45,7 @@ func main() {
 	var shopEndpoint string
 	flag.StringVar(&shopEndpoint, "shop", "localhost:9004", "Shop endpoint")
 	flag.Parse()
+	services.ConfigureOpenFilesLimit()
 	bank := bankApi.NewHttpBank(*bankEndpoint)
 	inconsistent := false
 
