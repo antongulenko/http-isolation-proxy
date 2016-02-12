@@ -88,7 +88,13 @@ func (store *AccountStore) show_account(w http.ResponseWriter, r *http.Request) 
 
 func (store *AccountStore) get_transaction(w http.ResponseWriter, r *http.Request) *Transaction {
 	trans_id := mux.Vars(r)["id"]
-	trans, ok := store.transactions[trans_id]
+	var trans *Transaction
+	var ok bool
+	func() {
+		store.transactionsLock.Lock()
+		defer store.transactionsLock.Unlock()
+		trans, ok = store.transactions[trans_id]
+	}()
 	if !ok || trans == nil {
 		services.Http_respond_error(w, r, "Transaction not found: "+trans_id, http.StatusNotFound)
 		return nil

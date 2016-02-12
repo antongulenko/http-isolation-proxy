@@ -15,12 +15,17 @@ const (
 
 type AccountStore struct {
 	accounts         map[string]*Account
-	lock             sync.Mutex
+	accountsLock     sync.Mutex
 	transactionQueue chan *Transaction
 	transactions     map[string]*Transaction
+	transactionsLock sync.Mutex
 }
 
 func (store *AccountStore) Stats() map[string]int {
+	store.transactionsLock.Lock()
+	defer store.transactionsLock.Unlock()
+	store.accountsLock.Lock()
+	defer store.accountsLock.Unlock()
 	result := make(map[string]int)
 	result["transaction_queue"] = len(store.transactionQueue)
 	result["num_transactions"] = len(store.transactions)
@@ -61,13 +66,15 @@ func (store *AccountStore) NewTransaction(account *Account, value float64, targe
 		store:         store,
 	}
 	trans.setState(TransactionPending)
+	store.transactionsLock.Lock()
+	defer store.transactionsLock.Unlock()
 	store.transactions[trans.Id] = trans
 	return trans
 }
 
 func (store AccountStore) GetAccount(username string) *Account {
-	store.lock.Lock()
-	defer store.lock.Unlock()
+	store.accountsLock.Lock()
+	defer store.accountsLock.Unlock()
 	if account, ok := store.accounts[username]; ok {
 		return account
 	} else {
