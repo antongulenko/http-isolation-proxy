@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	overload_request_duration = 3 * time.Second
-	overload_recovery_time    = 5 * time.Second
+	overload_request_duration = 10 * time.Second
+	overload_recovery_time    = 2 * time.Second
 	online_check_interval     = 500 * time.Millisecond
 	online_check_timeout      = 500 * time.Millisecond
 )
