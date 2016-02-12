@@ -91,30 +91,34 @@ func (endpoint *Endpoint) backgroundCheck() {
 	if endpoint.overloaded {
 		// In case of overload, just wait some time
 		// to let the endpoint recover from overload
-		time.Sleep(overload_recovery_time)
-		endpoint.activeLock.Lock()
-		defer endpoint.activeLock.Unlock()
-		if !endpoint.active && endpoint.overloaded {
-			endpoint.setActive()
-		}
+		go func() {
+			time.Sleep(overload_recovery_time)
+			endpoint.activeLock.Lock()
+			defer endpoint.activeLock.Unlock()
+			if !endpoint.active && endpoint.overloaded {
+				endpoint.setActive()
+			}
+		}()
 	} else {
-		for {
-			time.Sleep(online_check_interval)
-			err := endpoint.CheckConnection()
-			func() { // Extra func for defer
-				endpoint.activeLock.Lock()
-				defer endpoint.activeLock.Unlock()
-				if endpoint.active || endpoint.overloaded {
-					return // Something else resolved/changed the situation
-				}
-				if err == nil {
-					endpoint.setActive()
-					return
-				} else {
-					services.L.Tracef("%v offline: %v", endpoint, err)
-				}
-			}()
-		}
+		go func() {
+			for {
+				time.Sleep(online_check_interval)
+				err := endpoint.CheckConnection()
+				func() { // Extra func for defer
+					endpoint.activeLock.Lock()
+					defer endpoint.activeLock.Unlock()
+					if endpoint.active || endpoint.overloaded {
+						return // Something else resolved/changed the situation
+					}
+					if err == nil {
+						endpoint.setActive()
+						return
+					} else {
+						services.L.Tracef("%v offline: %v", endpoint, err)
+					}
+				}()
+			}
+		}()
 	}
 }
 
@@ -161,15 +165,13 @@ func (endpoint *Endpoint) setActive() {
 
 // Must be called with locked endpoint.activeLock
 func (endpoint *Endpoint) setInactive(err error) {
-	if endpoint.active {
-		services.L.Warnf("%v inactive due to: %v", endpoint, err)
-		endpoint.active = false
-		if err == nil {
-			err = endpoint.CheckConnection()
-		}
-		endpoint.overloaded = err == nil
-		go endpoint.backgroundCheck()
+	services.L.Warnf("%v inactive due to: %v", endpoint, err)
+	endpoint.active = false
+	if err == nil {
+		err = endpoint.CheckConnection()
 	}
+	endpoint.overloaded = err == nil
+	endpoint.backgroundCheck()
 }
 
 // Return empty string if the endpoint is not the local host
