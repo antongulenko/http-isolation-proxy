@@ -158,7 +158,9 @@ func (person *Person) shop() {
 			}
 		}
 		if openOrders >= person.OpenOrders {
-			services.L.Logf("%v skipping shopping because %v orders are already open", person.Name, openOrders)
+			services.L.LogLevelf(services.LevelNormal+1,
+				"%v skipping shopping because %v orders are already open", person.Name, openOrders)
+			return
 		}
 	}
 
