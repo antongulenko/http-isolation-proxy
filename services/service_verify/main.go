@@ -72,6 +72,7 @@ func main() {
 	var processedOrders uint64
 	var totalEarnedOrders float64
 	var totalShippedOrders uint64
+	var totalProcessingOrders uint64
 	for i := 0; i < num_users; i++ {
 		user := fmt.Sprintf("User%v", i)
 
@@ -85,6 +86,8 @@ func main() {
 				processedOrders++
 			} else if strings.HasPrefix(order.Status, "Cancelling because of:") {
 				cancelledOrders++
+			} else if order.Status == "processing" {
+				totalProcessingOrders++
 			} else {
 				fmt.Println("Unknown order status:", order.Status)
 				inconsistent = true
@@ -96,6 +99,10 @@ func main() {
 		}
 	}
 	fmt.Println("Orders processed:", processedOrders, "orders cancelled:", cancelledOrders)
+	if totalProcessingOrders > 0 {
+		log.Println("UNFINISHED: There are still %v orders to process", totalProcessingOrders)
+		inconsistent = true
+	}
 	if totalShipped != totalShippedOrders {
 		fmt.Printf("Inconsistent: shipped %v, shipped orders %v\n", totalShipped, totalShippedOrders)
 		inconsistent = true
