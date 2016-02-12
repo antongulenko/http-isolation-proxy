@@ -4,12 +4,14 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httputil"
+	"time"
 
 	"github.com/antongulenko/http-isolation-proxy/services"
 )
 
 var (
-	noActiveEndpointsErr = errors.New("No active endpoints")
+	noActiveEndpointsErr   = errors.New("No active endpoints")
+	emergency_wait_timeout = 2 * time.Second
 )
 
 type IsolationProxy struct {
@@ -44,12 +46,37 @@ func (director *Director) endpointFor(req *http.Request) (*Endpoint, error) {
 	endpoints, err := director.proxy.Registry.Endpoints(director.serviceName)
 	if err == nil {
 		endpoint := endpoints.Get()
+		if endpoint == nil {
+			endpoint = director.emergencyEndpoint(endpoints)
+		}
 		if endpoint != nil {
 			return endpoint, nil
 		}
 		err = noActiveEndpointsErr
 	}
 	return nil, err
+}
+
+func (director *Director) emergencyEndpoint(endpoints EndpointCollection) *Endpoint {
+	// TODO all this is a huge overhead just to wait for one of the endpoints to become active
+	endpointChan := make(chan *Endpoint, len(endpoints))
+	for _, endpoint := range endpoints {
+		// TODO reflect.Select() can be used to avoid extra goroutines
+		go func(endpoint *Endpoint) {
+			select {
+			case <-endpoint.WaitActive():
+				endpointChan <- endpoint
+			case <-time.After(emergency_wait_timeout):
+				return
+			}
+		}(endpoint)
+	}
+	select {
+	case <-time.After(emergency_wait_timeout):
+		return endpoints.EmergencyGet()
+	case endpoint := <-endpointChan:
+		return endpoint
+	}
 }
 
 func (director *Director) serviceUnavailable(req *http.Request) *http.Response {

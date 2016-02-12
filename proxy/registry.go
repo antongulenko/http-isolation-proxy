@@ -23,6 +23,21 @@ func (col EndpointCollection) Get() *Endpoint {
 	return result
 }
 
+func (col EndpointCollection) EmergencyGet() *Endpoint {
+	// Like Get(), but also include overloaded endpoints
+	// TODO whether this should be done depends on situation on endpoint and semantics of the call
+	var result *Endpoint
+	for _, endpoint := range col {
+		if endpoint.Active() || endpoint.Overloaded() {
+			// Balance based on current load and history of requests (round robin in low-load situations)
+			if result == nil || endpoint.Load() < result.Load() || endpoint.Reqs() < result.Reqs() {
+				result = endpoint
+			}
+		}
+	}
+	return result
+}
+
 // Alternative implementation would use a centralized registry server
 type LocalRegistry map[string]EndpointCollection
 

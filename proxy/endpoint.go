@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	overload_request_duration = 1 * time.Second
-	overload_recovery_time    = 2 * time.Second
+	overload_request_duration = 3 * time.Second
+	overload_recovery_time    = 5 * time.Second
 	online_check_interval     = 500 * time.Millisecond
 	online_check_timeout      = 500 * time.Millisecond
 )
@@ -21,12 +21,15 @@ type Endpoint struct {
 	Host    string
 
 	active        bool
+	overloaded    bool
 	reqs          uint
 	load          int
 	errors        int
 	lock          sync.Mutex
 	totalDuration time.Duration
-	onceInactive  sync.Once
+
+	activeLock    sync.Mutex
+	activeWaiters []chan<- *Endpoint
 }
 
 func (endpoint *Endpoint) String() string {
@@ -47,6 +50,10 @@ func (endpoint *Endpoint) Load() int {
 
 func (endpoint *Endpoint) Reqs() uint {
 	return endpoint.reqs
+}
+
+func (endpoint *Endpoint) Overloaded() bool {
+	return endpoint.overloaded
 }
 
 func (endpoint *Endpoint) Active() bool {
@@ -72,38 +79,55 @@ func (endpoint *Endpoint) RoundTrip(roundTripper func() error) {
 		endpoint.totalDuration += duration
 		if duration > overload_request_duration || err != nil {
 			endpoint.errors++
+			defer endpoint.activeLock.Unlock()
+			endpoint.activeLock.Lock()
 			endpoint.setInactive(err)
 		}
 	}()
 	err = roundTripper()
 }
 
-func (endpoint *Endpoint) setInactive(err error) {
-	endpoint.onceInactive.Do(func() {
-		services.L.Warnf("%v inactive due to: %v", endpoint, err)
-		endpoint.active = false
-		go func() {
-			defer endpoint.setActive()
-			if err == nil {
-				err = endpoint.CheckConnection()
-			}
-			if err == nil {
-				// If there is no error (but request took too long), wait some time
-				// to let the endpoint recover from overload
-				time.Sleep(overload_recovery_time)
-			} else {
-				for !endpoint.active {
-					time.Sleep(online_check_interval)
-					if err := endpoint.CheckConnection(); err != nil {
-						services.L.Tracef("%v offline: %v", endpoint, err)
-						continue
-					}
-					break
+func (endpoint *Endpoint) backgroundCheck() {
+	if endpoint.overloaded {
+		// In case of overload, just wait some time
+		// to let the endpoint recover from overload
+		time.Sleep(overload_recovery_time)
+		endpoint.activeLock.Lock()
+		defer endpoint.activeLock.Unlock()
+		if !endpoint.active && endpoint.overloaded {
+			endpoint.setActive()
+		}
+	} else {
+		for {
+			time.Sleep(online_check_interval)
+			err := endpoint.CheckConnection()
+			func() { // Extra func for defer
+				endpoint.activeLock.Lock()
+				defer endpoint.activeLock.Unlock()
+				if endpoint.active || endpoint.overloaded {
+					return // Something else resolved/changed the situation
 				}
+				if err == nil {
+					endpoint.setActive()
+					return
+				} else {
+					services.L.Tracef("%v offline: %v", endpoint, err)
+				}
+			}()
+		}
+	}
+}
 
-			}
-		}()
-	})
+func (endpoint *Endpoint) WaitActive() <-chan *Endpoint {
+	result := make(chan *Endpoint, 1)
+	defer endpoint.activeLock.Unlock()
+	endpoint.activeLock.Lock()
+	if endpoint.active {
+		result <- endpoint
+	} else {
+		endpoint.activeWaiters = append(endpoint.activeWaiters, result)
+	}
+	return result
 }
 
 func (endpoint *Endpoint) CheckConnection() error {
@@ -115,17 +139,37 @@ func (endpoint *Endpoint) CheckConnection() error {
 }
 
 func (endpoint *Endpoint) TestActive() {
-	if err := endpoint.CheckConnection(); err != nil {
-		endpoint.setInactive(err)
-	} else {
+	err := endpoint.CheckConnection()
+	defer endpoint.activeLock.Unlock()
+	endpoint.activeLock.Lock()
+	if err == nil {
 		endpoint.setActive()
+	} else {
+		endpoint.setInactive(err)
 	}
 }
 
+// Must be called with locked endpoint.activeLock
 func (endpoint *Endpoint) setActive() {
 	services.L.Warnf("%v active", endpoint)
 	endpoint.active = true
-	endpoint.onceInactive = sync.Once{} // Reset for next setInactive call
+	endpoint.overloaded = false
+	for _, waiter := range endpoint.activeWaiters {
+		waiter <- endpoint
+	}
+}
+
+// Must be called with locked endpoint.activeLock
+func (endpoint *Endpoint) setInactive(err error) {
+	if endpoint.active {
+		services.L.Warnf("%v inactive due to: %v", endpoint, err)
+		endpoint.active = false
+		if err == nil {
+			err = endpoint.CheckConnection()
+		}
+		endpoint.overloaded = err == nil
+		go endpoint.backgroundCheck()
+	}
 }
 
 // Return empty string if the endpoint is not the local host
