@@ -37,6 +37,8 @@ type Person struct {
 	running bool
 	paused  bool
 	cond    sync.Cond
+
+	OpenOrders uint
 }
 
 func (person *Person) String() string {
@@ -142,6 +144,24 @@ func (person *Person) pickShop() string {
 
 func (person *Person) shop() {
 	shopEndpoint := person.pickShop()
+
+	if person.OpenOrders > 0 {
+		orders, err := shopApi.AllOrders(shopEndpoint, person.Name)
+		person.ShopRequests++
+		if person.error(err) {
+			return
+		}
+		openOrders := uint(0)
+		for _, order := range orders {
+			if order.Status == "processing" {
+				openOrders++
+			}
+		}
+		if openOrders >= person.OpenOrders {
+			services.L.Logf("%v skipping shopping because %v orders are already open", person.Name, openOrders)
+		}
+	}
+
 	items, err := shopApi.AllItems(shopEndpoint)
 	person.ShopRequests++
 	if person.error(err) {

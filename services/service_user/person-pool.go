@@ -16,6 +16,8 @@ type Pool struct {
 	bankEndpoint  string
 	shopEndpoints []string
 	startTime     time.Time
+
+	OrdersPerPerson uint
 }
 
 func NewPool(bankEndpoint string, shopEndpoints []string) *Pool {
@@ -82,6 +84,7 @@ func (pool *Pool) PrintStats() {
 
 func (pool *Pool) addPerson() {
 	person := RandomPerson("User"+strconv.Itoa(len(pool.people)), pool.bankEndpoint, pool.shopEndpoints)
+	person.OpenOrders = pool.OrdersPerPerson
 	pool.people = append(pool.people, person)
 	person.Live(&pool.wg)
 }

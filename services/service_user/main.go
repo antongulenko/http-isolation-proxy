@@ -18,6 +18,7 @@ var (
 
 func main() {
 	num_users := flag.Uint("users", 5, "Number of simulated people")
+	orders_per_user := flag.Uint("orders", 5, "Maximum umber of simultaneous orders per person. 0 for no limitation.")
 	bank := flag.String("bank", "localhost:9001", "Bank endpoint")
 	timeout := flag.Duration("timeout", 0, "Timeout for automatically stopping load generation")
 	dynamicUsers := flag.Bool("dynamic", false, "Enable changing # of active users with arrow keys. CTRL-C breaks console")
@@ -29,6 +30,7 @@ func main() {
 	}
 	services.ConfigureOpenFilesLimit()
 	pool = NewPool(*bank, shops)
+	pool.OrdersPerPerson = *orders_per_user
 	pool.Start(int(*num_users))
 
 	if *dynamicUsers {
