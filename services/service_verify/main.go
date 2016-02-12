@@ -88,7 +88,11 @@ func main() {
 			} else {
 				fmt.Println("Unknown order status:", order.Status)
 				inconsistent = true
+				break
 			}
+		}
+		if inconsistent {
+			break
 		}
 	}
 	fmt.Println("Orders processed:", processedOrders, "orders cancelled:", cancelledOrders)
