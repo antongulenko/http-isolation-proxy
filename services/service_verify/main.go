@@ -39,6 +39,7 @@ func round(val float64) float64 {
 }
 
 func main() {
+	verbose := flag.Bool("v", false, "Print processing details")
 	bankEndpoint := flag.String("bank", "localhost:9001", "Bank endpoint")
 	var shopEndpoint string
 	flag.StringVar(&shopEndpoint, "shop", "localhost:9004", "Shop endpoint")
@@ -75,9 +76,13 @@ func main() {
 	var totalProcessingOrders uint64
 	for i := 0; i < num_users; i++ {
 		user := fmt.Sprintf("User%v", i)
-
 		orders, err := shopApi.AllOrders(shopEndpoint, user)
 		check(err)
+
+		if *verbose {
+			fmt.Printf("Checking %v orders of user %v\n", len(orders), user)
+		}
+
 		for _, order := range orders {
 			if strings.HasPrefix(order.Status, "Order processed successfully") {
 				item := itemMap[order.Item]
@@ -94,13 +99,10 @@ func main() {
 				break
 			}
 		}
-		if inconsistent {
-			break
-		}
 	}
 	fmt.Println("Orders processed:", processedOrders, "orders cancelled:", cancelledOrders)
 	if totalProcessingOrders > 0 {
-		log.Println("UNFINISHED: There are still %v orders to process", totalProcessingOrders)
+		fmt.Printf("UNFINISHED: There are still %v orders to process\n", totalProcessingOrders)
 		inconsistent = true
 	}
 	if totalShipped != totalShippedOrders {
