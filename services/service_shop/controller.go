@@ -25,10 +25,10 @@ func (shop *Shop) order_item(w http.ResponseWriter, r *http.Request) {
 	}
 	username := r.FormValue("user")
 	item := r.FormValue("item")
-	if err := shop.NewOrder(username, item, qty); err != nil {
+	if id, err := shop.NewOrder(username, item, qty); err != nil {
 		services.Http_respond_error(w, r, "Error creating order: "+err.Error(), http.StatusInternalServerError)
 	} else {
-		services.Http_respond(w, r, nil, http.StatusCreated)
+		services.Http_respond(w, r, ([]byte)(id), http.StatusCreated)
 	}
 }
 
@@ -38,5 +38,14 @@ func (shop *Shop) show_orders(w http.ResponseWriter, r *http.Request) {
 		services.Http_respond_json(w, r, orders)
 	} else {
 		services.Http_respond_error(w, r, "Failed to fetch orders: "+err.Error(), http.StatusInternalServerError)
+	}
+}
+
+func (shop *Shop) get_order(w http.ResponseWriter, r *http.Request) {
+	orderId := mux.Vars(r)["order"]
+	if order, err := shop.GetOrder(orderId); err != nil {
+		services.Http_respond_error(w, r, "Failed to fetch order "+orderId+": "+err.Error(), http.StatusInternalServerError)
+	} else {
+		services.Http_respond_json(w, r, order)
 	}
 }

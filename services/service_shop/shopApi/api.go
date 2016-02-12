@@ -10,12 +10,20 @@ import (
 
 type Item catalogApi.Item
 
+const (
+	OrderStatusProcessing = "processing"
+)
+
 type Order struct {
 	User     string `json:"user"`
 	Item     string `json:"item"`
 	Quantity uint64 `json:"quantity"`
 	Status   string `json:"status"`
 	Time     string `json:"time"`
+}
+
+func (order *Order) IsProcessing() bool {
+	return order.Status == OrderStatusProcessing
 }
 
 func AllItems(shopEndpoint string) ([]*Item, error) {
@@ -28,12 +36,16 @@ func AllOrders(shopEndpoint string, user string) ([]*Order, error) {
 	return result, services.Http_get_json("http://"+shopEndpoint+"/orders/"+user, &result)
 }
 
-func PlaceOrder(shopEndpoint string, user string, item string, quantity int64) error {
-	_, err := services.Http_post_string("http://"+shopEndpoint+"/order",
+func PlaceOrder(shopEndpoint string, user string, item string, quantity int64) (string, error) {
+	return services.Http_post_string("http://"+shopEndpoint+"/order",
 		url.Values{
 			"user": []string{user},
 			"item": []string{item},
 			"qty":  []string{fmt.Sprintf("%v", quantity)},
 		})
-	return err
+}
+
+func GetOrder(shopEndpoint string, orderId string) (*Order, error) {
+	var result *Order
+	return result, services.Http_get_json("http://"+shopEndpoint+"/order/"+orderId, &result)
 }

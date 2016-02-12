@@ -71,22 +71,22 @@ func (shop *Shop) MakeOrder(id string) *Order {
 	return order
 }
 
-func (shop *Shop) NewOrder(username string, item string, qty uint64) error {
+func (shop *Shop) NewOrder(username string, item string, qty uint64) (string, error) {
 	order_time := time.Now()
 	timestamp := strconv.FormatUint(uint64(order_time.Unix()), 10)
 	if err := shop.noteFreshOrder(username, item, qty); err != nil {
-		return err
+		return "", err
 	}
 	order := shop.MakeOrder(uuid.New())
 	order.User = username
 	order.Item = item
 	order.Quantity = qty
 	order.Timestamp = timestamp
-	order.Status = "processing"
+	order.Status = shopApi.OrderStatusProcessing
 	order.Time = order_time.String()
 
 	// TODO would be good to try to release the fresh_order lock if the transaction fails
-	return shop.redis.Transaction(func() error {
+	err := shop.redis.Transaction(func() error {
 		err := shop.redis.Cmd("sadd", user_orders_key+username, order.id).Err()
 		if err != nil {
 			return err
@@ -97,6 +97,11 @@ func (shop *Shop) NewOrder(username string, item string, qty uint64) error {
 		}
 		return order.Save()
 	})
+	if err == nil {
+		return order.id, nil
+	} else {
+		return "", err
+	}
 }
 
 func (shop *Shop) noteFreshOrder(username string, item string, qty uint64) error {
@@ -130,4 +135,15 @@ func (shop *Shop) AllOrders(username string) ([]*Order, error) {
 		result[i] = order
 	}
 	return result, nil
+}
+
+func (shop *Shop) GetOrder(order_id string) (*Order, error) {
+	order := shop.MakeOrder(order_id)
+	existed, err := order.LoadExisting()
+	if err != nil {
+		return nil, fmt.Errorf("Failed to fetch order %v: %v", order_id, err)
+	} else if !existed {
+		return nil, fmt.Errorf("Order does not exist: %v", order_id)
+	}
+	return order, nil
 }

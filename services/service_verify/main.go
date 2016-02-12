@@ -95,7 +95,7 @@ func main() {
 				processedOrders++
 			} else if strings.HasPrefix(order.Status, "Cancelling because of:") {
 				cancelledOrders++
-			} else if order.Status == "processing" {
+			} else if order.Status == shopApi.OrderStatusProcessing {
 				totalProcessingOrders++
 			} else {
 				fmt.Println("Unknown order status:", order.Status)

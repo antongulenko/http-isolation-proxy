@@ -38,7 +38,8 @@ type Person struct {
 	paused  bool
 	cond    sync.Cond
 
-	OpenOrders uint
+	OpenOrdersLimit uint
+	openOrders      map[string]bool
 }
 
 func (person *Person) String() string {
@@ -58,6 +59,7 @@ func RandomPerson(name string, bankEndpoint string, shopEndpoints []string) *Per
 		cond:          sync.Cond{L: new(sync.Mutex)},
 		paused:        true,
 		running:       true,
+		openOrders:    make(map[string]bool),
 	}
 }
 
@@ -145,23 +147,23 @@ func (person *Person) pickShop() string {
 func (person *Person) shop() {
 	shopEndpoint := person.pickShop()
 
-	if person.OpenOrders > 0 {
-		orders, err := shopApi.AllOrders(shopEndpoint, person.Name)
+	// First check on the status of open orders.
+	for orderId, _ := range person.openOrders {
+		order, err := shopApi.GetOrder(shopEndpoint, orderId)
 		person.ShopRequests++
 		if person.error(err) {
 			return
 		}
-		openOrders := uint(0)
-		for _, order := range orders {
-			if order.Status == "processing" {
-				openOrders++
-			}
+		if !order.IsProcessing() {
+			delete(person.openOrders, orderId)
 		}
-		if openOrders >= person.OpenOrders {
-			services.L.LogLevelf(services.LevelNormal+1,
-				"%v skipping shopping because %v orders are already open", person.Name, openOrders)
-			return
-		}
+	}
+
+	// Don't continue shopping if too many orders are open
+	if person.OpenOrdersLimit > 0 && len(person.openOrders) >= int(person.OpenOrdersLimit) {
+		services.L.LogLevelf(services.LevelNormal+1,
+			"%v skipping shopping because %v orders are already open", person.Name, len(person.openOrders))
+		return
 	}
 
 	items, err := shopApi.AllItems(shopEndpoint)
@@ -172,9 +174,12 @@ func (person *Person) shop() {
 	item_index := rand.Uint32() % uint32(len(items))
 	item := items[item_index].Name
 	services.L.Logf("%v ordering %v", person.Name, item)
-	err = shopApi.PlaceOrder(shopEndpoint, person.Name, item, 1)
+	id, err := shopApi.PlaceOrder(shopEndpoint, person.Name, item, 1)
 	person.ShopRequests++
-	person.error(err)
+	if person.error(err) {
+		return
+	}
+	person.openOrders[id] = true
 }
 
 func (person *Person) sleep() {

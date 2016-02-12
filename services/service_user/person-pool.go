@@ -84,7 +84,7 @@ func (pool *Pool) PrintStats() {
 
 func (pool *Pool) addPerson() {
 	person := RandomPerson("User"+strconv.Itoa(len(pool.people)), pool.bankEndpoint, pool.shopEndpoints)
-	person.OpenOrders = pool.OrdersPerPerson
+	person.OpenOrdersLimit = pool.OrdersPerPerson
 	pool.people = append(pool.people, person)
 	person.Live(&pool.wg)
 }

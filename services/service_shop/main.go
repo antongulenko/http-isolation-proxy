@@ -51,6 +51,7 @@ func main() {
 	mux := mux.NewRouter()
 	mux.HandleFunc("/shop", shop.show_items).Methods("GET")
 	mux.HandleFunc("/order", shop.order_item).Methods("POST").MatcherFunc(services.MatchFormKeys("user", "item", "qty"))
+	mux.HandleFunc("/order/{order}", shop.get_order).Methods("GET")
 	mux.HandleFunc("/orders/{user}", shop.show_orders).Methods("GET")
 
 	services.L.Warnf("Running on " + *addr)
