@@ -26,7 +26,6 @@ var (
 		"TV":        100,
 		"Spaceship": 0,
 	}
-	num_users = 1000
 )
 
 func roundInt(val float64) int {
@@ -39,6 +38,7 @@ func round(val float64) float64 {
 }
 
 func main() {
+	num_users := flag.Uint64("users", 1000, "Number of users to check")
 	verbose := flag.Bool("v", false, "Print processing details")
 	bankEndpoint := flag.String("bank", "localhost:9001", "Bank endpoint")
 	var shopEndpoint string
@@ -48,7 +48,6 @@ func main() {
 	inconsistent := false
 
 	allItems, err := shopApi.AllItems(shopEndpoint)
-
 	itemMap := make(map[string]*shopApi.Item)
 	var totalEarned float64
 	var totalShipped uint64
@@ -68,19 +67,22 @@ func main() {
 		totalShipped += item.Shipped
 		totalEarned += float64(item.Shipped) * item.Cost
 	}
+	if !inconsistent {
+		fmt.Println("All items are consistent!")
+	}
 
 	var cancelledOrders uint64
 	var processedOrders uint64
 	var totalEarnedOrders float64
 	var totalShippedOrders uint64
 	var totalProcessingOrders uint64
-	for i := 0; i < num_users; i++ {
+	for i := uint64(0); i < *num_users; i++ {
 		user := fmt.Sprintf("User%v", i)
 		orders, err := shopApi.AllOrders(shopEndpoint, user)
 		check(err)
 
 		if *verbose {
-			fmt.Printf("Checking %v orders of user %v\n", len(orders), user)
+			fmt.Printf("Checking %v orders of user %v (%v of %v users)\n", len(orders), user, i, *num_users)
 		}
 
 		for _, order := range orders {
