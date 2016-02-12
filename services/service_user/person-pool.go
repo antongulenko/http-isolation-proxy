@@ -73,13 +73,17 @@ func (pool *Pool) PrintStats() {
 	var bankRequests uint64
 	var shopRequests uint64
 	var totalErrors uint64
+	var totalSkippedShopping uint64
 	for _, person := range pool.people {
 		bankRequests += person.BankRequests
 		shopRequests += person.ShopRequests
 		totalErrors += person.TotalErrors
+		totalSkippedShopping += person.SkippedShopping
 	}
-	services.L.Warnf("Pool statistics:\nRuntime: %v\nShop Requests: %v\nShop Requests/second: %v\nBank Requests: %v\nBank Requests/second: %v\nTotal Errors: %v",
-		t, shopRequests, float64(shopRequests)/secs, bankRequests, float64(bankRequests)/secs, totalErrors)
+	services.L.Warnf(
+		"Pool statistics:\nRuntime: %v\nSkipped shopping: %v\n"+
+			"Shop Requests: %v\nShop Requests/second: %v\nBank Requests: %v\nBank Requests/second: %v\nTotal Errors: %v",
+		t, totalSkippedShopping, shopRequests, float64(shopRequests)/secs, bankRequests, float64(bankRequests)/secs, totalErrors)
 }
 
 func (pool *Pool) addPerson() {

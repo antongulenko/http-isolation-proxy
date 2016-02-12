@@ -30,9 +30,10 @@ type Person struct {
 	monthlyPay float64
 	Name       string
 
-	ShopRequests uint64
-	BankRequests uint64
-	TotalErrors  uint64
+	ShopRequests    uint64
+	BankRequests    uint64
+	TotalErrors     uint64
+	SkippedShopping uint64
 
 	running bool
 	paused  bool
@@ -161,6 +162,7 @@ func (person *Person) shop() {
 
 	// Don't continue shopping if too many orders are open
 	if person.OpenOrdersLimit > 0 && len(person.openOrders) >= int(person.OpenOrdersLimit) {
+		person.SkippedShopping++
 		services.L.LogLevelf(services.LevelNormal+1,
 			"%v skipping shopping because %v orders are already open", person.Name, len(person.openOrders))
 		return
