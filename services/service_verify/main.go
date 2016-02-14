@@ -132,11 +132,11 @@ func main() {
 	}
 	if balance != totalEarnedOrders {
 		fmt.Printf("Inconsistent earnings bank vs. orders. Expected %v, have %v\n", totalEarnedOrders, balance)
+		inconsistent = true
 		if balance > totalEarnedOrders {
 			fmt.Println(balance-totalEarnedOrders, "too much")
 		} else {
 			fmt.Println("Missing", totalEarnedOrders-balance)
-			inconsistent = true
 		}
 	}
 	fmt.Printf("Total shipped items %v, total earnings %v\n", totalShipped, totalEarned)
