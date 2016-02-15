@@ -222,13 +222,13 @@ type balancedEndpoint struct {
 	lock      sync.Mutex
 }
 
-var balancedEndpoints map[string]balancedEndpoint
+var balancedEndpoints map[string]*balancedEndpoint
 var balancedEndpointsConfig string
 var balancedEndpointsParsed bool
 var balancedEndpointsLock sync.Mutex
 
 func ParseBalanceEndpointsFlags() {
-	balancedEndpoints = make(map[string]balancedEndpoint)
+	balancedEndpoints = make(map[string]*balancedEndpoint)
 	flag.StringVar(&balancedEndpointsConfig, "balancedEndpoints", "",
 		"ini-file containing mappings from host:port to a list of host:port to be used instead")
 }
@@ -251,7 +251,7 @@ func ParseLoadBalanceConfig() {
 				log.Fatalf("Error getting default section from load balancing config file %v: %v\n", balancedEndpointsConfig, err)
 			}
 			for _, endpoint := range section.Keys() {
-				balancedEndpoints[endpoint.Name()] = balancedEndpoint{
+				balancedEndpoints[endpoint.Name()] = &balancedEndpoint{
 					endpoints: endpoint.Strings(","),
 				}
 			}
