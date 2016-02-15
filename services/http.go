@@ -3,12 +3,16 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 
+	"github.com/go-ini/ini"
 	"github.com/gorilla/mux"
 )
 
@@ -168,17 +172,20 @@ func Http_json_map_response(_response *http.Response, err error, url string, req
 }
 
 func Http_get_json(the_url string, result interface{}) error {
+	the_url = loadBalanceUrl(the_url)
 	resp, err := http.Get(the_url)
 	return Http_json_response(resp, err, the_url, &result)
 }
 
 func Http_simple_post(the_url string) error {
+	the_url = loadBalanceUrl(the_url)
 	resp, err := http.PostForm(the_url, nil)
 	_, err = Http_check_response(resp, err, the_url)
 	return err
 }
 
 func Http_post_string(the_url string, data url.Values) (string, error) {
+	the_url = loadBalanceUrl(the_url)
 	resp, err := http.PostForm(the_url, data)
 	if data, err := Http_check_response(resp, err, the_url); err != nil {
 		return "", err
@@ -204,5 +211,76 @@ func MakeHttpResponse(req *http.Request, code int, bodyContent string) *http.Res
 		Trailer:          nil,
 		TransferEncoding: nil,
 		TLS:              nil,
+	}
+}
+
+// =========================== HACK: dirty load-balancing mechanism for experiments
+
+type balancedEndpoint struct {
+	endpoints []string
+	next      uint
+	lock      sync.Mutex
+}
+
+var balancedEndpoints map[string]balancedEndpoint
+var balancedEndpointsConfig string
+var balancedEndpointsParsed bool
+var balancedEndpointsLock sync.Mutex
+
+func ParseBalanceEndpointsFlags() {
+	balancedEndpoints = make(map[string]balancedEndpoint)
+	flag.StringVar(&balancedEndpointsConfig, "balancedEndpoints", "",
+		"ini-file containing mappings from host:port to a list of host:port to be used instead")
+}
+
+func ParseLoadBalanceConfig() {
+	if !balancedEndpointsParsed {
+		balancedEndpointsLock.Lock()
+		defer balancedEndpointsLock.Unlock()
+		if !balancedEndpointsParsed {
+			balancedEndpointsParsed = true
+			if balancedEndpointsConfig == "" {
+				return // No configuration given
+			}
+			confIni, err := ini.Load(balancedEndpointsConfig)
+			if err != nil {
+				log.Fatalf("Error loading load balancing config file %v: %v\n", balancedEndpointsConfig, err)
+			}
+			section, err := confIni.GetSection("")
+			if err != nil {
+				log.Fatalf("Error getting default section from load balancing config file %v: %v\n", balancedEndpointsConfig, err)
+			}
+			for _, endpoint := range section.Keys() {
+				balancedEndpoints[endpoint.Name()] = balancedEndpoint{
+					endpoints: endpoint.Strings(","),
+				}
+			}
+			if len(balancedEndpoints) == 0 {
+				log.Fatalf("Load balancing config file did not contain any entries: %v\n", balancedEndpointsConfig)
+			}
+		}
+	}
+}
+
+func loadBalanceUrl(url_str string) string {
+	if balancedEndpointsConfig == "" {
+		return url_str
+	}
+	ParseLoadBalanceConfig()
+	new_url, err := url.Parse(url_str)
+	if err != nil {
+		// Error should pop up elsewhere
+		return url_str
+	}
+	if endpoint, ok := balancedEndpoints[new_url.Host]; ok {
+		endpoint.lock.Lock()
+		defer endpoint.lock.Unlock()
+		host := endpoint.endpoints[endpoint.next]
+		endpoint.next++
+		endpoint.next = endpoint.next % uint(len(endpoint.endpoints))
+		new_url.Host = host
+		return new_url.String()
+	} else {
+		return url_str
 	}
 }

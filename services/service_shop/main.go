@@ -27,7 +27,9 @@ func main() {
 	redisEndpoint := flag.String("redis", "127.0.0.1:6379", "Redis endpoint")
 	paymentEndpoint := flag.String("payment", "localhost:9002", "Endpoint for payment service")
 	catalogEndpoint := flag.String("catalog", "localhost:9003", "Endpoint for catalog service")
+	services.ParseBalanceEndpointsFlags()
 	flag.Parse()
+	services.ParseLoadBalanceConfig()
 	services.EnableResponseLogging()
 	services.ConfigureOpenFilesLimit()
 

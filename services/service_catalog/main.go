@@ -27,7 +27,9 @@ func fillDefaultCatalog(catalog *Catalog) error {
 func main() {
 	addr := flag.String("listen", "0.0.0.0:9003", "Endpoint address")
 	redisEndpoint := flag.String("redis", "127.0.0.1:6379", "Redis endpoint")
+	services.ParseBalanceEndpointsFlags()
 	flag.Parse()
+	services.ParseLoadBalanceConfig()
 	services.EnableResponseLogging()
 	services.ConfigureOpenFilesLimit()
 
