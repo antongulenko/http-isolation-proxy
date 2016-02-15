@@ -71,7 +71,7 @@ func (logger *Logger) Enable(level LogLevel) {
 }
 
 func (logger *Logger) Enabled() bool {
-	return logger.LevelEnabled(LevelOff)
+	return logger != nil && logger.logger != nil && logger.Level > LevelOff
 }
 
 func (logger *Logger) LevelEnabled(level LogLevel) bool {
