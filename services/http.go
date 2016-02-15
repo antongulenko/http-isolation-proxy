@@ -259,9 +259,9 @@ func ParseLoadBalanceConfig() {
 				log.Fatalf("Load balancing config file did not contain any entries: %v\n", balancedEndpointsConfig)
 			}
 			if L.LevelEnabled(LevelNormal) {
-				L.Logf("Ad-hoc load balancing enabled for:\n")
+				L.Logf("Ad-hoc load balancing enabled for:")
 				for host, endpoint := range balancedEndpoints {
-					L.Logf("%v => %v\n", host, endpoint.endpoints)
+					L.Logf("%v => %v", host, endpoint.endpoints)
 				}
 			}
 		}
