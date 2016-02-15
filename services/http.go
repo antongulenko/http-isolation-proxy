@@ -171,6 +171,12 @@ func Http_json_map_response(_response *http.Response, err error, url string, req
 	return obj, nil
 }
 
+func Http_get_json_map(the_url string, requiredKeys ...string) (map[string]interface{}, error) {
+	the_url = loadBalanceUrl(the_url)
+	resp, err := http.Get(the_url)
+	return Http_json_map_response(resp, err, the_url, requiredKeys...)
+}
+
 func Http_get_json(the_url string, result interface{}) error {
 	the_url = loadBalanceUrl(the_url)
 	resp, err := http.Get(the_url)

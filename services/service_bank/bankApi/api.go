@@ -2,8 +2,6 @@ package bankApi
 
 import (
 	"fmt"
-	"io/ioutil"
-	"net/http"
 	"net/url"
 	"strconv"
 
@@ -69,18 +67,16 @@ func NewHttpBank(endpoint string) Bank {
 }
 
 func (bank *HttpBank) Balance(account string) (float64, error) {
-	url := "http://" + bank.endpoint + "/account/" + account
-	resp, err := http.Get(url)
+	the_url := "http://" + bank.endpoint + "/account/" + account
 	var result HttpAccount
-	err = services.Http_json_response(resp, err, url, &result)
+	err := services.Http_get_json(the_url, &result)
 	if err != nil {
 		return 0, err
 	}
 	return result.Balance, nil
 }
 
-func (bank *HttpBank) checkTransactionResponse(resp *http.Response, err error, url string) (Transaction, error) {
-	data, err := services.Http_check_response(resp, err, url)
+func (bank *HttpBank) checkTransactionResponse(data string, err error, url string) (Transaction, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -100,12 +96,12 @@ func (bank *HttpBank) Transfer(from, to string, value float64) (Transaction, err
 
 func (bank *HttpBank) transfer(from, to string, value float64, auto_commit bool) (Transaction, error) {
 	the_url := "http://" + bank.endpoint + "/account/" + from + "/transfer"
-	data := url.Values{
-		"target": []string{to},
-		"value":  []string{fmt.Sprintf("%v", value)},
-		"commit": []string{strconv.FormatBool(auto_commit)},
-	}
-	resp, err := http.PostForm(the_url, data)
+	resp, err := services.Http_post_string(the_url,
+		url.Values{
+			"target": []string{to},
+			"value":  []string{fmt.Sprintf("%v", value)},
+			"commit": []string{strconv.FormatBool(auto_commit)},
+		})
 	return bank.checkTransactionResponse(resp, err, the_url)
 }
 
@@ -119,11 +115,11 @@ func (bank *HttpBank) PendingDeposit(account string, value float64) (Transaction
 
 func (bank *HttpBank) deposit(account string, value float64, auto_commit bool) (Transaction, error) {
 	the_url := "http://" + bank.endpoint + "/account/" + account + "/deposit"
-	data := url.Values{
-		"value":  []string{fmt.Sprintf("%v", value)},
-		"commit": []string{strconv.FormatBool(auto_commit)},
-	}
-	resp, err := http.PostForm(the_url, data)
+	resp, err := services.Http_post_string(the_url,
+		url.Values{
+			"value":  []string{fmt.Sprintf("%v", value)},
+			"commit": []string{strconv.FormatBool(auto_commit)},
+		})
 	return bank.checkTransactionResponse(resp, err, the_url)
 }
 
@@ -141,8 +137,7 @@ func (bank *HttpBank) GetTransaction(id string) (Transaction, error) {
 
 func (trans *HttpTransaction) Update() error {
 	the_url := "http://" + trans.bank.endpoint + "/transaction/" + trans.id
-	resp, err := http.Get(the_url)
-	data, err := services.Http_json_map_response(resp, err, the_url, "state", "error")
+	data, err := services.Http_get_json_map(the_url, "state", "error")
 	if err != nil {
 		return err
 	}
@@ -158,20 +153,9 @@ func (trans *HttpTransaction) Update() error {
 
 func (trans *HttpTransaction) performAction(action string) error {
 	the_url := "http://" + trans.bank.endpoint + "/transaction/" + trans.id + "/" + action
-	resp, err := http.PostForm(the_url, nil)
+	err := services.Http_simple_post(the_url)
 	if err != nil {
-		return err
-	}
-	if resp.StatusCode != http.StatusOK {
-		defer resp.Body.Close()
-		errData, err := ioutil.ReadAll(resp.Body)
-		errStr := string(errData)
-		if err != nil && errStr != "" {
-			errStr = ", " + errStr
-		} else {
-			errStr = ""
-		}
-		return fmt.Errorf("Failed to %s transaction (status %s%s)", action, resp.Status, errStr)
+		return fmt.Errorf("Failed to %s transaction: %v", action, err)
 	}
 	return nil
 }
