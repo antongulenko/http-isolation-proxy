@@ -76,6 +76,7 @@ func (r redis) Transaction(transaction func() error) error {
 
 	if err := transaction(); err != nil {
 		if abort_err := conn.Cmd("discard").Err; abort_err != nil {
+			// TODO this can change the type of the resulting error
 			return fmt.Errorf("%v. Error aborting transaction: %v", err, abort_err)
 		} else {
 			return err
