@@ -142,6 +142,7 @@ func main() {
 	fmt.Printf("Total shipped items %v, total earnings %v\n", totalShipped, totalEarned)
 
 	if inconsistent {
+		fmt.Printf("MAYBE THERE WERE MORE THAN %v USERS?\n", num_users)
 		os.Exit(1)
 	} else {
 		os.Exit(0)
