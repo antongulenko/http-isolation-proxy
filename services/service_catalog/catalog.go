@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -105,26 +106,30 @@ func (catalog *Catalog) GetItem(name string) (*Item, error) {
 }
 
 func (catalog *Catalog) RefillItems(timeout time.Duration, refills map[string]uint64) {
+	// Randomize the first sleep
+	randTimeout := time.Duration(rand.Int63n(int64(timeout)))
+	time.Sleep(randTimeout)
 	for {
-		time.Sleep(timeout)
 		services.L.Logf("Refilling items...")
 		for itemName, refill := range refills {
-			item, err := catalog.GetItem(itemName)
-			if err != nil {
-				services.L.Warnf("Error getting item %v for refill: %v", itemName, err)
-				continue
-			}
-			catalog.refillItem(item, refill)
+			catalog.refillItem(itemName, refill)
 		}
+		time.Sleep(timeout)
 	}
 }
 
-func (catalog *Catalog) refillItem(item *Item, refill uint64) {
-	err := item.redisLock.Transaction(func() error {
+func (catalog *Catalog) refillItem(itemName string, refill uint64) {
+	item := catalog.MakeItem(itemName, 0, 0)
+	err := item.redisLock.Transaction(func(redis services.Redis) error {
+		if existing, err := item.LoadExisting(); err != nil { // Load outside of transaction
+			return fmt.Errorf("Error getting item %v for refill: %v", item.Name, err)
+		} else if !existing {
+			return fmt.Errorf("Item %v does not exist for refill", item.Name)
+		}
 		if item.Stock == 0 {
 			item.Stock = refill
 			item.Refills += refill
-			if err := item.Save(); err == nil {
+			if err := item.SaveIn(redis); err == nil {
 				services.L.Warnf("Refilling item %s to %v", item.Name, refill)
 			} else {
 				services.L.Warnf("Error saving item %v after refilling to %v: %v", item.Name, refill, err)

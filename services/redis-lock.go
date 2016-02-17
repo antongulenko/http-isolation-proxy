@@ -68,15 +68,15 @@ func (lock *RedisLock) Lock() error {
 	}
 }
 
-func (lock *RedisLock) Transaction(transaction func() error) error {
+func (lock *RedisLock) Transaction(transaction func(redis Redis) error) error {
 	if err := lock.Lock(); err != nil {
 		return err
 	}
-	err := lock.Client.Transaction(func() error {
-		if err := transaction(); err != nil {
+	err := lock.Client.Transaction(func(redis Redis) error {
+		if err := transaction(redis); err != nil {
 			return err
 		}
-		return lock.Unlock()
+		return lock.UnlockIn(redis)
 	})
 	if err != nil {
 		// Transaction failed, try to unlock
@@ -87,6 +87,23 @@ func (lock *RedisLock) Transaction(transaction func() error) error {
 	return err
 }
 
+func (lock *RedisLock) LockedDo(do func()) error {
+	if err := lock.Lock(); err != nil {
+		return err
+	}
+	defer func() {
+		if err := lock.Unlock(); err != nil {
+			L.Warnf("Failed to unlock lock %v (%v): %v", lock.LockName, lock.LockValue, err)
+		}
+	}()
+	do()
+	return nil
+}
+
 func (lock *RedisLock) Unlock() error {
-	return lock.Client.Cmd("evalsha", lua_sha_unlock, 1, lock.LockName, lock.LockValue).Err()
+	return lock.UnlockIn(lock.Client)
+}
+
+func (lock *RedisLock) UnlockIn(redis Redis) error {
+	return redis.Cmd("evalsha", lua_sha_unlock, 1, lock.LockName, lock.LockValue).Err()
 }

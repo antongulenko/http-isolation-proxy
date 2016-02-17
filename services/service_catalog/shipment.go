@@ -136,17 +136,17 @@ func (shipment *Shipment) Deliver() error {
 
 func (shipment *Shipment) modifyItem(description string, modify func(item *Item) error) error {
 	item := shipment.catalog.MakeItem(shipment.Item, 0, 0)
-	return item.redisLock.Transaction(func() error {
-		if err := item.Load(); err != nil {
+	return item.redisLock.Transaction(func(redis services.Redis) error {
+		if err := item.Load(); err != nil { // Load happens outside of transaction
 			return fmt.Errorf("Error loading item %v for shipment processing: %v", item.Name, err)
 		}
 		if err := modify(item); err != nil {
 			return err
 		}
-		if err := item.Save(); err != nil {
+		if err := item.SaveIn(redis); err != nil {
 			return fmt.Errorf("Error saving modified item %v for shipment processing: %v", item.Name, err)
 		}
-		if err := shipment.Save(); err != nil {
+		if err := shipment.SaveIn(redis); err != nil {
 			return fmt.Errorf("Error saving modified shipment: %v", item.Name, err)
 		}
 		return nil

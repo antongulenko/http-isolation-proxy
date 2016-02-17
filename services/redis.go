@@ -1,6 +1,7 @@
 package services
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/mediocregopher/radix.v2/pool"
@@ -11,9 +12,13 @@ const (
 	poolSize = 20
 )
 
+var (
+	nestedTransactionError = errors.New("Cannot nest redis transactions")
+)
+
 type Redis interface {
 	Cmd(cmd string, args ...interface{}) RedisResponse
-	Transaction(transaction func() error) error
+	Transaction(transaction func(redis Redis) error) error
 	StoreStruct(key string, obj interface{}) error
 	LoadStruct(key string, obj interface{}) error
 }
@@ -63,18 +68,19 @@ func (resp redisResponse) HasResult() bool {
 	return !resp.IsType(impl.Nil)
 }
 
-func (r redis) Transaction(transaction func() error) error {
+func (r redis) Transaction(transaction func(trans Redis) error) error {
 	conn, err := r.client.Get()
 	if err != nil {
 		return err
 	}
 	defer r.client.Put(conn)
+	trans := &transactionRedis{conn}
 
 	if err := conn.Cmd("multi").Err; err != nil {
 		return fmt.Errorf("Failed to start redis transaction: %v", err)
 	}
 
-	if err := transaction(); err != nil {
+	if err := transaction(trans); err != nil {
 		if abort_err := conn.Cmd("discard").Err; abort_err != nil {
 			// TODO this can change the type of the resulting error
 			return fmt.Errorf("%v. Error aborting transaction: %v", err, abort_err)
@@ -88,4 +94,18 @@ func (r redis) Transaction(transaction func() error) error {
 	}
 
 	return nil
+}
+
+type transactionRedis struct {
+	*impl.Client
+}
+
+func (trans *transactionRedis) Cmd(cmd string, args ...interface{}) RedisResponse {
+	return redisResponse{
+		Resp: trans.Client.Cmd(cmd, args...),
+	}
+}
+
+func (trans *transactionRedis) Transaction(transaction func(Redis) error) error {
+	return nestedTransactionError
 }

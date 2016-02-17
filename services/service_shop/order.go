@@ -54,22 +54,21 @@ func (shop *Shop) processOrder(order_id string) {
 		Expiration: order_processing_expiration,
 	}
 	order := shop.MakeOrder(order_id)
-	err := lock.Transaction(func() error {
+	err := lock.LockedDo(func() {
 		existed, err := order.LoadExisting()
 		if err != nil {
-			return err
+			services.L.Logf("Error retrieving order: %v", err)
 		} else if !existed {
-			return fmt.Errorf("order does not exist")
+			services.L.Warnf("Locked order %v does not exist", order_id)
 		}
 		item, err := catalogApi.GetItem(shop.catalogEndpoint, order.Item)
 		if err != nil {
-			return fmt.Errorf("Failed to retrieve item '%s' for order processing: %v", order.Item, err)
+			services.L.Warnf("Failed to retrieve item '%s' for order processing: %v", order.Item, err)
 		}
 		shop.doProcessOrder(order, item)
-		return nil
 	})
 	if err != nil {
-		services.L.Logf("Error processing order %v: %v", err)
+		services.L.Logf("Error (un)locking order %v for processing: %v", order_id, err)
 	}
 }
 
@@ -268,12 +267,12 @@ func (order *Order) doCancel(success bool, log string) error {
 	}
 
 	// Remove the order from the list of open orders & store cancel log
-	return order.shop.redis.Transaction(func() error {
+	return order.shop.redis.Transaction(func(redis services.Redis) error {
 		order.Status = cancelLog
-		err := order.shop.redis.Cmd("srem", open_orders_key, order.id).Err()
+		err := redis.Cmd("srem", open_orders_key, order.id).Err()
 		if err != nil {
 			return err
 		}
-		return order.Save()
+		return order.SaveIn(redis)
 	})
 }

@@ -86,16 +86,16 @@ func (shop *Shop) NewOrder(username string, item string, qty uint64) (string, er
 	order.Time = order_time.String()
 
 	// TODO would be good to try to release the fresh_order lock if the transaction fails
-	err := shop.redis.Transaction(func() error {
-		err := shop.redis.Cmd("sadd", user_orders_key+username, order.id).Err()
+	err := shop.redis.Transaction(func(redis services.Redis) error {
+		err := redis.Cmd("sadd", user_orders_key+username, order.id).Err()
 		if err != nil {
 			return err
 		}
-		err = shop.redis.Cmd("sadd", open_orders_key, order.id).Err()
+		err = redis.Cmd("sadd", open_orders_key, order.id).Err()
 		if err != nil {
 			return err
 		}
-		return order.Save()
+		return order.SaveIn(redis)
 	})
 	if err == nil {
 		return order.id, nil

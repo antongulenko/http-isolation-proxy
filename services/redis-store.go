@@ -28,6 +28,19 @@ func iterateStructFields(structVal reflect.Value, do func(name string, fieldValu
 	}
 }
 
+func redisCanParse(kind reflect.Kind) bool {
+	switch kind {
+	case reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
+		reflect.Float32, reflect.Float64,
+		reflect.String:
+		return true
+	default:
+		return false
+	}
+}
+
 // ============================ Saving ============================
 
 func AsMap(obj interface{}) map[string]interface{} {
@@ -53,17 +66,12 @@ func (r *redis) StoreStruct(key string, obj interface{}) error {
 	return r.Cmd("hmset", key, values).Err()
 }
 
-func redisCanParse(kind reflect.Kind) bool {
-	switch kind {
-	case reflect.Bool,
-		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
-		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64,
-		reflect.Float32, reflect.Float64,
-		reflect.String:
-		return true
-	default:
-		return false
+func (r *transactionRedis) StoreStruct(key string, obj interface{}) error {
+	values := AsMap(obj)
+	if values == nil {
+		return fmt.Errorf("Non-struct value: %T %v", obj, obj)
 	}
+	return r.Cmd("hmset", key, values).Err()
 }
 
 // ============================ Loading ============================
@@ -130,6 +138,15 @@ func (r *redis) LoadStruct(key string, obj interface{}) error {
 	return nil
 }
 
+func (r *transactionRedis) LoadStruct(key string, obj interface{}) error {
+	values, err := r.Cmd("hgetall", key).Map()
+	if err != nil {
+		return err
+	}
+	FillFromMap(values, obj)
+	return nil
+}
+
 // ============================ Support ============================
 
 type Storable interface {
@@ -145,8 +162,12 @@ func (stored *StoredObject) Exists() (bool, error) {
 	return stored.S.Client().Cmd("exists", stored.S.Key()).Bool()
 }
 
+func (stored *StoredObject) SaveIn(redis Redis) error {
+	return redis.StoreStruct(stored.S.Key(), stored.S)
+}
+
 func (stored *StoredObject) Save() error {
-	return stored.S.Client().StoreStruct(stored.S.Key(), stored.S)
+	return stored.SaveIn(stored.S.Client())
 }
 
 func (stored *StoredObject) Load() error {
