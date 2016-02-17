@@ -53,36 +53,27 @@ func (shop *Shop) processOrder(order_id string) {
 		LockValue:  shop.redisLockValue,
 		Expiration: order_processing_expiration,
 	}
-
-	if err := lock.Lock(); err != nil {
-		// Lock failed, somebody else is processing the order
-		services.L.Tracef("Locking order for processing failed: %v", err)
-		return
-	}
-	defer func() {
-		if err := lock.Unlock(); err != nil {
-			services.L.Warnf("Unlocking order failed: %v\n", err)
-		}
-	}()
-
 	order := shop.MakeOrder(order_id)
-	existed, err := order.LoadExisting()
+	err := lock.Transaction(func() error {
+		existed, err := order.LoadExisting()
+		if err != nil {
+			return err
+		} else if !existed {
+			return fmt.Errorf("order does not exist")
+		}
+		item, err := catalogApi.GetItem(shop.catalogEndpoint, order.Item)
+		if err != nil {
+			return fmt.Errorf("Failed to retrieve item '%s' for order processing: %v", order.Item, err)
+		}
+		shop.doProcessOrder(order, item)
+		return nil
+	})
 	if err != nil {
-		services.L.Logf("Error fetching order %v: %v", order_id, err)
-		return
-	} else if !existed {
-		services.L.Logf("Order locked for processing not found: %v", order_id)
-		return
+		services.L.Logf("Error processing order %v: %v", err)
 	}
-	shop.doProcessOrder(order)
 }
 
-func (shop *Shop) doProcessOrder(order *Order) {
-	item, err := catalogApi.GetItem(shop.catalogEndpoint, order.Item)
-	if err != nil {
-		services.L.Logf("Failed to retrieve item '%s' for order processing: %v", order.Item, err)
-		return
-	}
+func (shop *Shop) doProcessOrder(order *Order, item *catalogApi.Item) {
 	if order.assertShipment(item) &&
 		order.assertPayment(item) &&
 		order.commitShipment() &&

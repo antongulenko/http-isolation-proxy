@@ -136,22 +136,10 @@ func (shipment *Shipment) Deliver() error {
 
 func (shipment *Shipment) modifyItem(description string, modify func(item *Item) error) error {
 	item := shipment.catalog.MakeItem(shipment.Item, 0, 0)
-
-	// Lock the item we are about to change.
-	if err := item.redisLock.Lock(); err != nil {
-		return fmt.Errorf("Failed to lock item: %v", err)
-	}
-	defer func() {
-		if err := item.redisLock.Unlock(); err != nil {
-			services.L.Warnf("Error releasing redis lock for item:", err)
+	err := item.redisLock.Transaction(func() error {
+		if err := item.Load(); err != nil {
+			return err
 		}
-	}()
-
-	if err := item.Load(); err != nil {
-		return fmt.Errorf("Error updating item for %v shipment: %v", description, err)
-	}
-
-	return shipment.Client().Transaction(func() error {
 		if err := modify(item); err != nil {
 			return err
 		}
@@ -163,6 +151,10 @@ func (shipment *Shipment) modifyItem(description string, modify func(item *Item)
 		}
 		return nil
 	})
+	if err != nil {
+		return fmt.Errorf("Error updating item for %v shipment: %v", description, err)
+	}
+	return nil
 }
 
 func (shipment *Shipment) doCommit() error {
