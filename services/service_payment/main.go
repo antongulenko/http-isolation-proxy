@@ -34,7 +34,7 @@ func main() {
 		bank:           bank,
 		redis:          redisClient,
 		accountName:    "store",
-		redisLockValue: *addr, // Should be unique and constant per endpoint
+		redisLockValue: services.EndpointLockValue(*addr),
 	}
 	mux := mux.NewRouter()
 	mux.HandleFunc("/payment", payments.new_payment).Methods("POST").MatcherFunc(services.MatchFormKeys("user", "value", "ts"))

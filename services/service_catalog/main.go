@@ -44,7 +44,7 @@ func main() {
 
 	catalog := &Catalog{
 		redis:          redisClient,
-		redisLockValue: *addr, // Should be unique and constant per endpoint
+		redisLockValue: services.EndpointLockValue(*addr),
 	}
 	if err := fillDefaultCatalog(catalog); err != nil {
 		log.Fatalln("Error filling default catalog:", err)

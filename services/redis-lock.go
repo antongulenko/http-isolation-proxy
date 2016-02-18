@@ -4,13 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/pborman/uuid"
 )
 
 var LockFailed = errors.New("Failed to acquire lock")
 
 var (
-	lua_sha_unlock  = ""
-	lua_sha_execute = ""
+	lua_sha_unlock      = ""
+	lua_sha_execute     = ""
+	endpoint_lock_value string
 )
 
 const (
@@ -26,12 +29,27 @@ const (
 	`
 )
 
+func init() {
+	addr, err := FirstIpAddress()
+	if err != nil {
+		endpoint_lock_value = uuid.New()
+		L.Warnf("Failed to determine IP address: %v", err)
+		L.Warnf("Using random value for redis locks: %v", endpoint_lock_value)
+	}
+	endpoint_lock_value = addr.String()
+}
+
 type RedisLock struct {
 	Client     Redis
 	LockName   string
 	LockValue  string // Should be unique per client
 	Expiration time.Duration
 	Retry      uint
+}
+
+// Return a string that is unique per client/endpoint. addr should contain service port.
+func EndpointLockValue(addr string) string {
+	return endpoint_lock_value + ":" + addr
 }
 
 func RegisterLockScripts(client Redis) error {

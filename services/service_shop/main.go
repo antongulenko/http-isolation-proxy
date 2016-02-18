@@ -44,7 +44,7 @@ func main() {
 
 	shop := &Shop{
 		redis:           redisClient,
-		redisLockValue:  *addr, // Should be unique and constant per endpoint
+		redisLockValue:  services.EndpointLockValue(*addr),
 		catalogEndpoint: *catalogEndpoint,
 		paymentEndpoint: *paymentEndpoint,
 	}
