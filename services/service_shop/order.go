@@ -54,22 +54,31 @@ func (shop *Shop) processOrder(order_id string) {
 		Expiration: order_processing_expiration,
 	}
 	order := shop.MakeOrder(order_id)
-	err := lock.LockedDo(func() {
-		existed, err := order.LoadExisting()
-		if err != nil {
-			services.L.Logf("Error retrieving order: %v", err)
-		} else if !existed {
-			services.L.Warnf("Locked order %v does not exist", order_id)
-		}
-		item, err := catalogApi.GetItem(shop.catalogEndpoint, order.Item)
-		if err != nil {
-			services.L.Warnf("Failed to retrieve item '%s' for order processing: %v", order.Item, err)
-		}
-		shop.doProcessOrder(order, item)
-	})
-	if err != nil {
-		services.L.Logf("Error (un)locking order %v for processing: %v", order_id, err)
+
+	if err := lock.TryLock(); err != nil {
+		// Somebody processing this order already
+		return
 	}
+	defer func() {
+		if err := lock.Unlock(); err != nil {
+			services.L.Logf("Error unlocking order %v after processing: %v", order_id, err)
+		}
+	}()
+
+	// Loading once is enough: all further calls are completely idempontent
+	// The locking is purely for performance, to avoid unnecessary HTTP calls from multiple shop instances
+	existed, err := order.LoadExisting()
+	if err != nil {
+		services.L.Logf("Error retrieving order: %v", err)
+	} else if !existed {
+		services.L.Warnf("Locked order %v does not exist", order_id)
+	}
+
+	item, err := catalogApi.GetItem(shop.catalogEndpoint, order.Item)
+	if err != nil {
+		services.L.Warnf("Failed to retrieve item '%s' for order processing: %v", order.Item, err)
+	}
+	shop.doProcessOrder(order, item)
 }
 
 func (shop *Shop) doProcessOrder(order *Order, item *catalogApi.Item) {

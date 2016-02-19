@@ -70,18 +70,18 @@ func (resp redisResponse) HasResult() bool {
 
 func (r redis) Transaction(transaction func(trans Redis) error) error {
 	conn, err := r.client.Get()
+	trans := &transactionRedis{conn}
 	if err != nil {
 		return err
 	}
 	defer r.client.Put(conn)
-	trans := &transactionRedis{conn}
 
-	if err := conn.Cmd("multi").Err; err != nil {
+	if err := trans.Cmd("multi").Err(); err != nil {
 		return fmt.Errorf("Failed to start redis transaction: %v", err)
 	}
 
 	if err := transaction(trans); err != nil {
-		if abort_err := conn.Cmd("discard").Err; abort_err != nil {
+		if abort_err := trans.Cmd("discard").Err(); abort_err != nil {
 			// TODO this can change the type of the resulting error
 			return fmt.Errorf("%v. Error aborting transaction: %v", err, abort_err)
 		} else {
@@ -89,10 +89,10 @@ func (r redis) Transaction(transaction func(trans Redis) error) error {
 		}
 	}
 
-	if err := conn.Cmd("exec").Err; err != nil {
+	_, err = trans.Cmd("exec").List()
+	if err != nil {
 		return fmt.Errorf("Failed to commit redis transaction: %v", err)
 	}
-
 	return nil
 }
 
