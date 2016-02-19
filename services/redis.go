@@ -61,7 +61,21 @@ func (resp redisResponse) Bool() (bool, error) {
 }
 
 func (resp redisResponse) Err() error {
-	return resp.Resp.Err
+	if resp.Resp.Err != nil {
+		return resp.Resp.Err
+	}
+	if resp.Resp.IsType(impl.Array) {
+		arr, err := resp.Resp.Array()
+		if err != nil {
+			return err
+		}
+		for _, a := range arr {
+			if a.Err != nil {
+				return a.Err
+			}
+		}
+	}
+	return nil
 }
 
 func (resp redisResponse) HasResult() bool {
@@ -89,8 +103,7 @@ func (r redis) Transaction(transaction func(trans Redis) error) error {
 		}
 	}
 
-	_, err = trans.Cmd("exec").List()
-	if err != nil {
+	if err := trans.Cmd("exec").Err(); err != nil {
 		return fmt.Errorf("Failed to commit redis transaction: %v", err)
 	}
 	return nil
