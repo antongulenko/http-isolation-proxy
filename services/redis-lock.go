@@ -12,7 +12,6 @@ var LockFailed = errors.New("Failed to acquire lock")
 
 var (
 	lua_sha_unlock      = ""
-	lua_sha_execute     = ""
 	endpoint_lock_value string
 )
 
@@ -22,7 +21,7 @@ const (
 	if res == ARGV[1] then
 	    return redis.call("del",KEYS[1])
 	elseif res == false then
-		return {err = 'Lock does not exist: ' .. KEYS[1]}
+	    return {err = 'Lock does not exist: ' .. KEYS[1]}
 	else
 	    return {err = 'Lock is owned by other key'}
 	end
@@ -103,19 +102,6 @@ func (lock *RedisLock) Transaction(transaction func(redis Redis) error) error {
 		}
 	}
 	return err
-}
-
-func (lock *RedisLock) LockedDo(do func()) error {
-	if err := lock.Lock(); err != nil {
-		return err
-	}
-	defer func() {
-		if err := lock.Unlock(); err != nil {
-			L.Warnf("Failed to unlock lock %v (%v): %v", lock.LockName, lock.LockValue, err)
-		}
-	}()
-	do()
-	return nil
 }
 
 func (lock *RedisLock) Unlock() error {
