@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/antongulenko/http-isolation-proxy/proxy"
 	"github.com/antongulenko/http-isolation-proxy/services"
@@ -82,15 +83,17 @@ func main() {
 	check(err)
 	configFile := flag.String("conf", execFolder+"/isolator.ini", "Config containing isolated external services")
 	statsAddr := flag.String("stats", ":7777", "Address to serve statistics (HTTP+JSON on "+stats_path+" and "+runtime_path+")")
+	dialTimeout := flag.Duration("timeout", 5*time.Second, "Timeout for outgoing TCP connections")
 	flag.Parse()
 	services.ConfigureOpenFilesLimit()
 
 	confIni, err := ini.Load(*configFile)
 	check(err)
 
-	p := &proxy.IsolationProxy{
-		Registry: loadServiceRegistry(confIni),
-	}
+	p := proxy.NewIsolationProxy(
+		loadServiceRegistry(confIni),
+		*dialTimeout,
+	)
 	services.EnableResponseLogging()
 	p.ServeStats(stats_path)
 	proxy.ServeRuntimeStats(runtime_path)

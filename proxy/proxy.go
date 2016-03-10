@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"errors"
+	"net"
 	"net/http"
 	"net/http/httputil"
 	"time"
@@ -15,11 +16,28 @@ var (
 )
 
 type IsolationProxy struct {
-	Registry Registry
+	Registry  Registry
+	transport *http.Transport
+}
+
+func NewIsolationProxy(registry Registry, dialTimeout time.Duration) *IsolationProxy {
+	return &IsolationProxy{
+		Registry: registry,
+		// Based on http.DefaultTransport
+		transport: &http.Transport{
+			Proxy: http.ProxyFromEnvironment,
+			Dial: (&net.Dialer{
+				Timeout:   dialTimeout,
+				KeepAlive: dialTimeout,
+			}).Dial,
+			TLSHandshakeTimeout: dialTimeout,
+		},
+	}
 }
 
 type Director struct {
 	proxy       *IsolationProxy
+	transport   *http.Transport
 	serviceName string
 }
 
@@ -93,11 +111,11 @@ func (director *Director) RoundTrip(req *http.Request) (*http.Response, error) {
 		endpoint.ConfigureUrl(req.URL)
 		var resp *http.Response
 		endpoint.RoundTrip(func() error {
-			resp, err = http.DefaultTransport.RoundTrip(req)
+			resp, err = director.proxy.transport.RoundTrip(req)
 			return err
 		})
 		if err != nil {
-			services.L.Warnf("Error forwarding %s to %v for %s: %v. Trying again...", director.serviceName, endpoint, req.URL.Path, err)
+			services.L.Warnf("Error forwarding %s to %v for %s: %v. Will try other endpoint...", director.serviceName, endpoint, req.URL.Path, err)
 			return director.RoundTrip(req) // Should pick a different endpoint
 		}
 		return resp, err
