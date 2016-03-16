@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/antongulenko/golib"
 	"github.com/antongulenko/http-isolation-proxy/services"
 	"github.com/gorilla/mux"
 )
@@ -31,7 +32,7 @@ func main() {
 	flag.Parse()
 	services.ParseLoadBalanceConfig()
 	services.EnableResponseLogging()
-	services.ConfigureOpenFilesLimit()
+	golib.ConfigureOpenFilesLimit()
 
 	redisClient, err := services.ConnectRedis(*redisEndpoint)
 	if err != nil {

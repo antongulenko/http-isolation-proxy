@@ -8,6 +8,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/antongulenko/golib"
 	"github.com/antongulenko/http-isolation-proxy/services"
 )
 
@@ -22,13 +23,13 @@ func main() {
 	bank := flag.String("bank", "localhost:9001", "Bank endpoint")
 	timeout := flag.Duration("timeout", 0, "Timeout for automatically stopping load generation")
 	dynamicUsers := flag.Bool("dynamic", false, "Enable changing # of active users with arrow keys. CTRL-C breaks console")
-	var shops services.StringSlice
+	var shops golib.StringSlice
 	flag.Var(&shops, "shop", "Shop endpoint(s)")
 	flag.Parse()
 	if len(shops) == 0 {
 		log.Fatalln("Specify at least one -shop")
 	}
-	services.ConfigureOpenFilesLimit()
+	golib.ConfigureOpenFilesLimit()
 	pool = NewPool(*bank, shops)
 	pool.OrdersPerPerson = *orders_per_user
 	pool.Start(int(*num_users))

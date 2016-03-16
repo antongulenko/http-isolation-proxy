@@ -5,16 +5,17 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/antongulenko/golib"
 	"github.com/antongulenko/http-isolation-proxy/services"
 	"github.com/gorilla/mux"
 )
 
 func main() {
-	services.ConfiguredOpenFilesLimit = 40000
+	golib.ConfiguredOpenFilesLimit = 40000
 	addr := flag.String("listen", "0.0.0.0:9001", "Endpoint address")
 	flag.Parse()
 	services.EnableResponseLogging()
-	services.ConfigureOpenFilesLimit()
+	golib.ConfigureOpenFilesLimit()
 
 	store := NewAccountStore(1000, 200)
 

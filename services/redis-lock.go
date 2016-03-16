@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/antongulenko/golib"
 	"github.com/pborman/uuid"
 )
 
@@ -41,7 +42,7 @@ const (
 )
 
 func init() {
-	addr, err := FirstIpAddress()
+	addr, err := golib.FirstIpAddress()
 	if err != nil {
 		endpoint_lock_value = uuid.New()
 		L.Warnf("Failed to determine IP address: %v", err)

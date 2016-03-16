@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/antongulenko/golib"
 	"github.com/antongulenko/http-isolation-proxy/services"
 	"github.com/antongulenko/http-isolation-proxy/services/service_bank/bankApi"
 	"github.com/gorilla/mux"
@@ -18,7 +19,7 @@ func main() {
 	flag.Parse()
 	services.ParseLoadBalanceConfig()
 	services.EnableResponseLogging()
-	services.ConfigureOpenFilesLimit()
+	golib.ConfigureOpenFilesLimit()
 
 	bank := bankApi.NewHttpBank(*bankEndpoint)
 	redisClient, err := services.ConnectRedis(*redisEndpoint)

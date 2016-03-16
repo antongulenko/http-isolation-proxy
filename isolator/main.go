@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/antongulenko/golib"
 	"github.com/antongulenko/http-isolation-proxy/proxy"
 	"github.com/antongulenko/http-isolation-proxy/services"
 	"github.com/go-ini/ini"
@@ -85,7 +86,7 @@ func main() {
 	statsAddr := flag.String("stats", ":7777", "Address to serve statistics (HTTP+JSON on "+stats_path+" and "+runtime_path+")")
 	dialTimeout := flag.Duration("timeout", 5*time.Second, "Timeout for outgoing TCP connections")
 	flag.Parse()
-	services.ConfigureOpenFilesLimit()
+	golib.ConfigureOpenFilesLimit()
 
 	confIni, err := ini.Load(*configFile)
 	check(err)
