@@ -1,10 +1,6 @@
 package main
 
-import (
-	"sync"
-
-	"github.com/antongulenko/golib"
-)
+import "sync"
 
 type OrderPool struct {
 	ParallelOrders uint
@@ -12,14 +8,12 @@ type OrderPool struct {
 	Shops          []string
 	User           string
 
-	stopper *golib.Stopper
 	running bool
 	orders  []*OrderRoutine
 	wg      sync.WaitGroup
 }
 
 func (pool *OrderPool) Start() {
-	pool.stopper = golib.NewStopper()
 	pool.running = true
 	pool.orders = make([]*OrderRoutine, pool.ParallelOrders)
 	for i := uint(0); i < pool.ParallelOrders; i++ {
